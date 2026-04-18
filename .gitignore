@@ -1,0 +1,5 @@
+# Each subfolder is an independent git repo — not tracked here
+tti-helper-aws/
+tti-helper-mobile/
+tti-helper-iot/
+ttireader/
