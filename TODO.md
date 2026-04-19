@@ -1,6 +1,8 @@
 # TTI Helper — Next Steps
 
-Open items as of 2026-04-19, after landing the mobile OTA + MQTT WiFi-change work (commits `320914e..ec5f35b` on `tti-helper-mobile/main`).
+Open items as of 2026-04-19, after landing:
+- Mobile OTA + MQTT WiFi-change work (commits `320914e..ec5f35b` on `tti-helper-mobile/main`).
+- Device ID gating + iOS theme polish (commit `345b155` on `tti-helper-mobile/main`).
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
@@ -28,3 +30,9 @@ In priority order:
 3. **Status cache invalidation** — `MqttService._latestStatusByThingId` is never cleared; goes stale if a device's firmware changes out-of-band.
 4. **BLE password-write try/catch** — currently swallows all exceptions. Acceptable given the firmware reboot race, but worth distinguishing expected disconnect from other failures.
 5. **Wildcard status subscription scope** — `+/status` subscribes to all devices; fine for single-device users, may need tightening later.
+
+## 4. Phase 3: lift the Device ID gating
+
+The Welcome screen currently blocks Troubleshooting and Inspection until a Device ID is saved (via `configuredDeviceIdProvider`), and shows an amber banner prompting configuration. This is a Phase 2 workaround because the tech enters the Thing ID manually. When Phase 3 wires device binding through the TTI portal, remove the gating in `welcome_screen.dart` (banner + tile SnackBar checks) and the `configuredDeviceIdProvider` if nothing else needs it.
+
+**Repo:** `tti-helper-mobile`
