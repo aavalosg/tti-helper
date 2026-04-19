@@ -2,6 +2,8 @@
 
 Open items as of 2026-04-19, after landing the mobile OTA + MQTT WiFi-change work (commits `320914e..ec5f35b` on `tti-helper-mobile/main`).
 
+> **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
+
 ## 1. Verify AWS IoT policy matches new status topicfilter
 
 Mobile now subscribes to `dt/esp32/ttireaderv1/+/status` (wildcard) instead of the per-thingID form. Confirm the deployed policy in `tti-helper-aws/lib/tti-helper-aws-stack.ts` isn't stricter — the existing `topicfilter/dt/esp32/ttireaderv1/*` looks compatible, but the previous exact-match subscription was being silently denied, so double-check what's actually live.
