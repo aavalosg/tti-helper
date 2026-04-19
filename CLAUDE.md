@@ -6,6 +6,18 @@ For single-project work, `cd` into the relevant subfolder and run Claude there.
 
 ---
 
+## On session start
+
+When Claude is invoked in this parent directory, begin every conversation with a brief status report:
+
+1. Run `git status -s` and `git log @{u}..HEAD --oneline` inside each of `tti-helper-iot/`, `tti-helper-mobile/`, and `tti-helper-aws/` — summarize any uncommitted changes and unpushed commits per repo. If a repo is clean and in sync, say so in one line.
+2. Read `TODO.md` (sibling to this file) and show the current next-steps list.
+3. Keep the summary tight — one short section per repo, then the TODO list. No extra commentary until the user asks.
+
+If the user immediately asks a specific question, answer that first and fold the status report into the response only if relevant.
+
+---
+
 ## Repository Map
 
 | Folder | Language | GitHub Repo | Purpose |
