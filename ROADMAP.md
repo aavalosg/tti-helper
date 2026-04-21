@@ -30,7 +30,7 @@ Status key: ✅ Done | 🔄 In Progress | ⏳ Pending
 
 ### Business / Legal ⏳
 - **#L1** Form company — Delaware C-Corp recommended.
-- **#L2** Domains — `ttifire.com` + `ttifire.io` via Cloudflare (confirm purchased/pointed).
+- **#L2** Domain — `ttihelper.com` purchased at Cloudflare Registrar (2026-04-20). ✅ Domain acquired; DNS/email setup pending. No `.io` purchased.
 - **#L3** Apple Developer account ($99/yr) at developer.apple.com.
 - **#L4** IoT SIM contract — consider Hologram or Twilio Super SIM for early stage; re-engage AT&T/Verizon once volume justifies.
 
@@ -78,7 +78,7 @@ Portal → API Gateway → Python Lambda → AWS IoT Core Management API (not MQ
 ### Features ⏳
 | # | Task | Notes |
 |---|------|-------|
-| 3.0 | Company website (`ttifire.com`) | Public marketing site, launched with portal |
+| 3.0 | Company website (`ttihelper.com`) | Public marketing site, launched with portal |
 | 3.1 | Admin sign-in | Cognito User Pool: TTI Admins |
 | 3.2 | Client sign-in | Cognito User Pool: Clients |
 | 3.3 | Client enrollment | Admin creates client record (company, contacts) |
