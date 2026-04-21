@@ -27,6 +27,7 @@ If the user immediately asks a specific question, answer that first and fold the
 | `tti-helper-iot/` | C (FreeRTOS) | tti-helper-iot | ESP32 firmware: reads FACP serial, publishes MQTT |
 | `tti-helper-hw/` | Gerber / PCB | tti-helper-hw | Hardware design: PCB gerbers, drill files, board analysis |
 | `tti-helper-legal/` | HTML | tti-helper-legal | Public legal pages served via GitHub Pages at `https://aavalosg.github.io/tti-helper-legal/` (privacy policy) |
+| `tti-helper-web/` | HTML / CSS | tti-helper-web | Public marketing site at `https://ttihelper.com`, deployed via Cloudflare Workers + Assets from `public/` on push to `main` |
 | `tti-helper-portal-admin/` | TBD (Phase 3, planning) | TBD | Internal back-office console for TTI staff. Empty placeholder until Phase 3 starts. See `PHASE_3_PLAN.md`. |
 | `tti-helper-portal-client/` | TBD (Phase 3, planning) | TBD | Multi-tenant customer portal (pool model, tenant_id). Empty placeholder until Phase 3 starts. See `PHASE_3_PLAN.md`. |
 | `../ttireader/` (sibling) | C (Arduino) | ttireader | Legacy ESP32 firmware — pre-refactor ancestor of `tti-helper-iot`. Sibling to this parent folder, read-only reference. |
