@@ -25,9 +25,11 @@ If the user immediately asks a specific question, answer that first and fold the
 | `tti-helper-aws/` | TypeScript (CDK) | tti-helper-aws | AWS infrastructure: Cognito, IoT Core, IAM |
 | `tti-helper-mobile/` | Dart (Flutter) | tti-helper-mobile | iOS/Android app: alarms, commands, BLE provisioning |
 | `tti-helper-iot/` | C (FreeRTOS) | tti-helper-iot | ESP32 firmware: reads FACP serial, publishes MQTT |
-| `ttireader/` | C (Arduino) | ttireader | Legacy ESP32 firmware — superseded by tti-helper-iot |
+| `tti-helper-hw/` | Gerber / PCB | tti-helper-hw | Hardware design: PCB gerbers, drill files, board analysis |
+| `tti-helper-legal/` | HTML | tti-helper-legal | Public legal pages served via GitHub Pages at `https://aavalosg.github.io/tti-helper-legal/` (privacy policy) |
 | `tti-helper-portal-admin/` | TBD (Phase 3, planning) | TBD | Internal back-office console for TTI staff. Empty placeholder until Phase 3 starts. See `PHASE_3_PLAN.md`. |
 | `tti-helper-portal-client/` | TBD (Phase 3, planning) | TBD | Multi-tenant customer portal (pool model, tenant_id). Empty placeholder until Phase 3 starts. See `PHASE_3_PLAN.md`. |
+| `../ttireader/` (sibling) | C (Arduino) | ttireader | Legacy ESP32 firmware — pre-refactor ancestor of `tti-helper-iot`. Sibling to this parent folder, read-only reference. |
 
 Each subfolder is an independent git clone with its own GitHub remote. This parent folder provides shared architectural context only — it does not track the subfolders via git submodules.
 
