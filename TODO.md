@@ -31,7 +31,7 @@ Open items as of 2026-04-25, after landing:
 - [ ] Optional: in App Store Connect, expire build (4) so it's not confusable with (5).
 - [ ] Assign (5) to Internal + External groups (auto-promotes — still 1.0.0 marketing version).
 - [ ] Field-test 7-step sequence on real Notifier panel (TROUBL → CLR TB → ALARM → SYSTEM RESET → TROUBL → SYSTEM NORMAL → TROUBL).
-- [ ] **CLR ACT pairing:** in build (4) field test, CLR ACT did not clear its matching ACTIVE event. Same code in (5). If reproduces, **capture the raw text of both messages** (gray monospace lines on the cards) — without those strings the parser/state-machine mismatch can't be diagnosed precisely. Likely a body-format difference (e.g. one has `Z003`, the other doesn't).
+- [x] **CLR ACT pairing fixed (commit `01d3e76`).** Root cause: Notifier's CLR field abuts the device-type field with no space, producing `CLR ACTTRACK SUPERV ...`. Both `_reClearActive` and the `_incidentKey` prefix-strip required a trailing space, so CLR ACT was misclassified as `system`. Fix relaxes the regex (lookahead to uppercase) and lets the prefix-strip handle CLR TB / CLR ACT without a trailing separator. 3 regression tests added in `test/facp/notify360_parser_test.dart`.
 - [ ] Replace iOS launch image — currently the default Flutter placeholder (flagged at build time by `flutter build ipa`). Not blocking for TestFlight, but **required before App Store Production submission** (Apple reviewers reject placeholder launch images). Asset lives at `ios/Runner/Assets.xcassets/LaunchImage.imageset/`.
 - [ ] If 7-step Notifier test passes AND CLR ACT issue is fixed (likely build 6) AND launch image is replaced: bump to `1.0.1+1` for App Store Production submission.
 
