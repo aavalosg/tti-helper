@@ -60,9 +60,9 @@ IoT Device → AWS IoT Core → IoT Rule → SQS FIFO → Lambda → DynamoDB
 
 ---
 
-## Phase 3 — Portal Admin + Portal Client (`tti-helper-aws` CDK additions + two new portal repos)
+## Phases 3–6 — Back-end + Portals + Marketing site
 
-> **See `PHASE_3_PLAN.md`** for the full planning doc — multi-tenancy model, regions, i18n, compliance, stack decomposition, decision log, and open questions. The sections below are the older feature list, kept for history; the plan doc is now the source of truth for Phase 3 strategy.
+> **See `PHASES_3_TO_6_PLAN.md`** for the full planning doc — phase split (3 = `tti-helper-aws`, 4 = `tti-helper-portal-admin`, 5 = `tti-helper-portal-client`, 6 = `tti-helper-web`), multi-tenancy model, regions, i18n, compliance, stack decomposition, decision log, and open questions. The sections below are the older feature list, kept for history; the plan doc is now the source of truth for Phase 3–6 strategy.
 
 ### Tech stack
 | Layer | Technology |
