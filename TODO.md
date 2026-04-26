@@ -1,49 +1,63 @@
 # TTI Helper — Next Steps
 
-Open items as of 2026-04-25, after landing:
-- Mobile OTA + MQTT WiFi-change work (commits `320914e..ec5f35b` on `tti-helper-mobile/main`).
-- Device ID gating + iOS theme polish (commit `345b155` on `tti-helper-mobile/main`).
-- Troubleshooting Active page state-machine fix (commits `bca2d18..21d2050` on `tti-helper-mobile/main`).
-  See `tti-helper-mobile/docs/TTI_HELPER_TROUBLESHOOTING.md` and `troubleshooting-active-bugs.pdf`.
-- UX polish + sign-out confirmation (commit `cc2a684` on `tti-helper-mobile/main`, build 4).
-- Notifier reset/normal differentiation (commits `78c0fe0..3a853ec` on `tti-helper-mobile/main`, build 5).
-
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(5) ready to upload
+## 0. In flight — TestFlight 1.0.0(8) ready to upload
 
-**Local state as of 2026-04-25:**
-- `pubspec.yaml` is `1.0.0+5`. HEAD on `main` is `3a853ec`.
-- `.ipa` is built and waiting at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa` (39 MB). **Not yet uploaded to App Store Connect.**
+**Local state as of 2026-04-26:**
+- `pubspec.yaml` is `1.0.0+8`. HEAD on `tti-helper-mobile/main` is `af61122`.
+- (8) IPA built and waiting at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. **Not yet uploaded to App Store Connect** — overwrites the (7) IPA.
+
+**Commits landed for (8):**
+- `5e6c270` — `fix(inspection): keep notes scoped to each event entry`
+- `e1149a9` — `feat(reports): drop TYPE/ZONE columns, photo appendix, add sort options`
+- `eb1e11e` — `fix(firelite): make RESET / ACK / SILENC no-ops on Active`
+- `af61122` — `fix(reports): keep per-event photos inline in Inspection report` (follow-up; `e1149a9` had inadvertently dropped per-event photos along with the appendix)
 
 **Build history on App Store Connect:**
-- (3) — Notifier CLR TB / SYSTEM NORMAL parser fix. Live in External, field-tested on user's iPhone (47 sessions, 0 crashes).
-- (4) — adds version label on login screen + sign-out confirmation dialog. Uploaded 2026-04-25; user confirmed everything in (4) works in field test.
-- (5) — adds SYSTEM NORMAL stays-visible behavior + SYSTEM RESET wipes alarms only (not troubles) + Notifier-only gating. **Local IPA ready**, awaiting upload.
-
-**What (5) implements (Notifier-specific rules):**
-- SYSTEM NORMAL → wipes everything + remains as the sole entry in Active until the next condition.
-- SYSTEM RESET → wipes only alarms / ACTIVE-prefix events; troubles persist.
-- Other panel models retain build-3 wipe-everything-on-reset behavior.
-
-**Resumption checklist (in order):**
-- [ ] Upload `1.0.0(5)` IPA via Transporter.
-- [ ] Optional: in App Store Connect, expire build (4) so it's not confusable with (5).
-- [ ] Assign (5) to Internal + External groups (auto-promotes — still 1.0.0 marketing version).
-- [ ] Field-test 7-step sequence on real Notifier panel (TROUBL → CLR TB → ALARM → SYSTEM RESET → TROUBL → SYSTEM NORMAL → TROUBL).
-- [x] **CLR ACT pairing fixed (commit `01d3e76`).** Root cause: Notifier's CLR field abuts the device-type field with no space, producing `CLR ACTTRACK SUPERV ...`. Both `_reClearActive` and the `_incidentKey` prefix-strip required a trailing space, so CLR ACT was misclassified as `system`. Fix relaxes the regex (lookahead to uppercase) and lets the prefix-strip handle CLR TB / CLR ACT without a trailing separator. 3 regression tests added in `test/facp/notify360_parser_test.dart`.
-- [ ] Replace iOS launch image — currently the default Flutter placeholder (flagged at build time by `flutter build ipa`). Not blocking for TestFlight, but **required before App Store Production submission** (Apple reviewers reject placeholder launch images). Asset lives at `ios/Runner/Assets.xcassets/LaunchImage.imageset/`.
-- [ ] If 7-step Notifier test passes AND CLR ACT issue is fixed (likely build 6) AND launch image is replaced: bump to `1.0.1+1` for App Store Production submission.
-
-**"What to Test" notes for the (5) External submission:**
-
-> Build 1.0.0 (5) — Notifier Active page state-machine refinements.
-> What's new since build (4): SYSTEM NORMAL wipes Active and stays visible there as the sole entry until the next event arrives; SYSTEM RESET clears alarms and ACTIVE-prefix events only (troubles persist); ACK/SIGNAL SILENCED have no effect on Active.
-> Verify on Notifier panel: TROUBL → CLR TB pairing, ALARM → SYSTEM RESET clears alarm but troubles remain, SYSTEM NORMAL wipes + stays as sole entry, new TROUBL removes the SYSTEM NORMAL entry.
-> Known issue under investigation: CLR ACT may not clear its matching ACTIVE event. If you see this, screenshot or copy the raw text of BOTH the ACTIVE line and the CLR ACT line.
+- (3) — Notifier CLR TB / SYSTEM NORMAL parser fix. Field-tested (47 sessions, 0 crashes).
+- (4) — version label on login screen + sign-out confirmation dialog. Field-tested.
+- (5) — SYSTEM NORMAL stays-visible + SYSTEM RESET wipes alarms only + Notifier-only gating. Field-tested.
+- (6) — skipped.
+- (7) — Active-tab bucket filter, ACTIVE→Others, Inspection bucket filter, Inspection photos in report PDF, 2400/4800 baud picker, CLR ACT concatenation fix. Field-tested 2026-04-26.
+- (8) — Inspection notes scoping + report cleanup (no TYPE/ZONE cols, no Photo Appendix, sort options) + Fire-Lite RESET no-op. **Local IPA ready**, awaiting upload.
 
 **Permanent fixes already in place (won't repeat):**
-- `ITSAppUsesNonExemptEncryption=false` in `Info.plist` — no more Export Compliance prompt on any build.
+- `ITSAppUsesNonExemptEncryption=false` in `Info.plist` — no Export Compliance prompt on any build.
+
+**Outstanding pre-Production gate (still not done):**
+- [ ] Replace iOS launch image — currently the default Flutter placeholder (flagged at every `flutter build ipa`). Not blocking for TestFlight, but **required before App Store Production submission**. Asset lives at `ios/Runner/Assets.xcassets/LaunchImage.imageset/`.
+
+**Resumption checklist for (8):**
+- [ ] Upload `1.0.0(8)` IPA via Transporter.
+- [ ] Optional: in App Store Connect, expire build (7) so it's not confusable with (8).
+- [ ] Assign (8) to Internal + External groups.
+- [ ] Field-test on bench:
+  - Inspection: switch between event entries with notes filled — confirm prior device's notes don't leak into the next.
+  - Inspection report PDF: confirm Photo Appendix gone, TYPE / FACP ZONE columns gone, sort selector defaults to Address/Device with Time available.
+  - Troubleshooting report PDF: confirm TYPE / ZONE columns gone, by-time order only.
+  - Fire-Lite RESET on the panel: confirm Active list does NOT wipe; events persist until their CLEAR(x) arrives.
+  - Fire-Lite NAC: trigger NAC 1 OPEN trouble + CLEART pair — confirm OPEN clears, NAC 1 FAULT (if present) remains active.
+
+**"What to Test" notes for the (8) External submission:**
+
+> Build 1.0.0 (8) — Inspection + Reporting cleanup, Fire-Lite RESET fix.
+> Inspection: notes are now scoped per event entry — switching between devices in a testing area shows each device's own notes only.
+> Reports: TYPE and FACP ZONE columns removed from Troubleshooting and Inspection reports. Inspection report drops the trailing Photo Appendix; zone-level and per-event photos now render inline within each testing-area block. Inspection report gains a sort selector (Address/Device default, Time as alternate). Troubleshooting report stays in time order.
+> Fire-Lite: pressing RESET on the panel no longer wipes Active in the app; events clear only via their own CLEAR(x) / RESTOR commands, per panel spec.
+
+## 0b. Done in (8)
+
+- [x] **Inspection — "Comments by Device" carryover bug.** Stable `ValueKey(entry.id)` on `_EventEntryTile` prevents Flutter from reusing controller state across entries when the bucket filter changes or list reorders. (`5e6c270`)
+- [x] **Reports — drop Photo Appendix from Inspection report.** (`e1149a9` removed the appendix; `af61122` restored per-event photos inline beneath each zone's data table, captioned by event time + description, after I noticed the appendix removal had also dropped per-event photos by mistake.)
+- [x] **Reports — drop TYPE and FACP ZONE columns** from Troubleshooting and Inspection reports. (`e1149a9`)
+- [x] **Reports — sort options.** Troubleshooting keeps only by-time (no selector); Inspection gains an `InspectionReportSort` selector with byAddressDevice (default, sorts entries by description → time → result within zone) and byTime. Threaded through `FinalizeResult` → `InspectionPdfPreviewArgs` → generator. (`e1149a9`)
+- [x] **Fire-Lite — RESET / ACK / SILENC are no-ops on Active.** Early-return on `FacpModel.firelite9050` in `_updateActiveMap`'s system case. Vigilant / EST iO / unknown panels keep the legacy wipe behavior. (`eb1e11e`)
+- [x] **Fire-Lite — CLEART NAC pairing verified via tests.** Parser already produces matching `incidentKey` for TROUBL/CLEART NAC OPEN; OPEN/FAULT keys are distinct. The reported "CLEART NAC isn't working" symptom on the bench was the RESET wipe arriving first — addressed by the RESET no-op above. New tests cover NAC OPEN pairing and OPEN-vs-FAULT key disjointness. (`eb1e11e`)
+
+## 0c. Backlog — not bound to (8)
+
+- [ ] **Messages lost while app is suspended (iOS standby)** — when the iPhone enters standby or the app is backgrounded, iOS suspends the process and the MQTT WebSocket connection drops; any alarms published during that window never reach the app on resume. Critical for a life-safety product. Likely path: route alarms through **APNs push notifications** (AWS IoT Rule → SNS → APNs) so the OS wakes the app/shows the alert independently of the in-app MQTT session. In-app MQTT then resyncs on foreground. Decide whether to keep MQTT for live foreground use only, or also add a "missed events since X" replay (retained MQTT or a tiny REST endpoint backed by IoT analytics / DynamoDB). Cross-repo: `tti-helper-mobile` + `tti-helper-aws`.
 
 ## 1. Address risks flagged in the mobile review
 
