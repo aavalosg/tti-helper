@@ -18,21 +18,20 @@ Status key: ✅ Done | 🔄 In Progress | ⏳ Pending
 - MQTT alarms + commands
 - Cognito email OTP auth
 - Biometric lock
-- BLE provisioning + WiFi update via BLE
+- BLE provisioning + WiFi update via BLE (physical-device test confirmed)
 - Ground fault wizard + loop topology
 - PDF session export (3 entry points)
+- **#U1 Theme rebrand** — landed on teal-green primary (`#00A884`) + light-gray/off-white surface in `lib/shared/theme/app_theme.dart`; adaptive light/dark modes.
 
 ### Pending ⏳
 - **#8 SMS OTP** — code deployed; blocked on AWS toll-free number. Console → SNS → Origination identities → Request toll-free; then sandbox-verify `+17863570769`.
-- **#20 BLE WiFi update** 🔄 — code done (commit `fe1cb26`), needs physical-device test.
-- **#U1 Rebrand colors** (red/white) — palette in `phase1_pending.md`; change confined to `lib/shared/theme/app_theme.dart` plus audit of hardcoded `Color(0xFF00A884)`.
 - **#P1 FACP parsers** — additional models from manuals: Notifier NFS2-3030, Silent Knight SK-5208/5820XL, Simplex 4100ES/4010ES, Gamewell-FCI E3, Siemens Cerberus PRO/Sinteso, Bosch FPA-5000, Mircom FX-2000, Fire-Lite MS-9200UDLS, Kidde/Honeywell.
 
-### Business / Legal ⏳
-- **#L1** Form company — Delaware C-Corp recommended.
-- **#L2** Domain — `ttihelper.com` purchased at Cloudflare Registrar (2026-04-20). ✅ Domain acquired; DNS/email setup pending. No `.io` purchased.
-- **#L3** Apple Developer account ($99/yr) at developer.apple.com.
-- **#L4** IoT SIM contract — consider Hologram or Twilio Super SIM for early stage; re-engage AT&T/Verizon once volume justifies.
+### Business / Legal
+- **#L1** Form company — Delaware C-Corp recommended. ⏳
+- **#L2** Domain — `ttihelper.com` purchased at Cloudflare Registrar (2026-04-20); DNS + `no-reply@ttihelper.com` sending via SES. ✅
+- **#L3** Apple Developer account ($99/yr) at developer.apple.com. ✅
+- **#L4** IoT SIM contract — consider Hologram or Twilio Super SIM for early stage; re-engage AT&T/Verizon once volume justifies. ⏳
 
 ---
 
@@ -119,6 +118,125 @@ Portal → API Gateway → Python Lambda → AWS IoT Core Management API (not MQ
 - Fields: work performed, parts replaced, technician info, sign-off
 - Generates PDF completion certificate (reuses session PDF pipeline)
 - Activates the greyed-out button on the Welcome Screen
+
+---
+
+## Emergency Fleet OTA (urgent + mandatory updates)
+
+Fleet-wide firmware push for exceptional cases — security CVE, alarm-path
+bug with life-safety impact, certificate rotation on a tight window,
+compliance deadline. The existing per-device OTA flow (mobile publishes
+`OTA` to `cmd/esp32/ttireaderv1/{thingID}`) is not designed for this.
+
+### Prerequisites (do these regardless of delivery mechanism)
+
+1. **Signed firmware** — device verifies an ECDSA signature against a
+   public key burned into firmware before flashing. Without this, anyone
+   who can publish MQTT can push arbitrary code. Largest single gap in
+   the current OTA design. **Repo:** `tti-helper-iot`.
+2. **A/B OTA partitions + rollback** — use ESP-IDF `esp_ota_*` so a
+   failed-boot image auto-reverts via bootloader. Verify this is on;
+   if not, wire it in. **Repo:** `tti-helper-iot`.
+3. **`mandatory: true` flag in OTA payload** — when present, firmware
+   skips any user confirmation and flashes immediately. Non-mandatory
+   updates can still be deferred. **Repos:** `tti-helper-iot`,
+   `tti-helper-mobile`.
+
+### Delivery mechanism — three options
+
+**Option A — AWS IoT Jobs (recommended at fleet > ~100 devices)**
+- Admin creates a Job via `aws iot create-job` targeting a thing group.
+- Firmware-side: subscribe to `$aws/things/{thingName}/jobs/notify-next`;
+  handle `GetPendingJobExecutions` / `UpdateJobExecution`.
+- Policy update: add `iot:Subscribe|Receive|Publish` on
+  `$aws/things/${iot:ClientId}/jobs/*` to `tti-iot-device-policy`.
+- Benefits: staged rollout rate, per-device status (`QUEUED → IN_PROGRESS
+  → SUCCEEDED / FAILED / TIMED_OUT`), abort-on-failure-rate, offline
+  durability (queued on the thing), timeouts, audit.
+- Cost: ~$0.0025 per device per execution (negligible).
+- Work: ~300–500 LOC of C on firmware + CDK / admin CLI on cloud.
+- **Bootstrapping:** devices need to be reflashed once to install the
+  Jobs agent. Use the existing `OTA` command path to do that push.
+
+**Option B — Broadcast MQTT topic (fast to ship, do not use alone)**
+- Add `cmd/esp32/ttireaderv1/broadcast/ota`; all devices subscribe.
+- Arrives in <1s to online devices; offline devices miss it unless the
+  publish is retained (and retained on wildcard topics creates re-flash
+  loops on reconnect). No per-device ack. No rollback. No staged rollout.
+- Acceptable only layered behind signed firmware + A/B partitions + a
+  cancel/override mechanism — which is most of what Jobs gives you for
+  free. Mostly useful as a supplementary "notify" channel, not the
+  primary delivery path.
+
+**Option C — Brute-force loop over existing per-device OTA (stopgap)**
+- Admin CLI (new script under `tti-helper-aws/scripts/`) iterates every
+  `thingID`, publishes the existing `OTA` payload to
+  `cmd/esp32/ttireaderv1/{thingID}`, rate-limited (e.g. 5/sec).
+- Zero firmware change — uses tested code.
+- Status arrives via existing `dt/esp32/ttireaderv1/{thingID}/status`
+  topic after device reboots with new `firmware_version`; script watches
+  and reports laggards.
+- No abort safety net mid-flight beyond stopping the script. Offline
+  devices need a rerun.
+- Fit: good emergency button for small fleet, exceptional use.
+
+### Recommended execution order
+
+1. **Prerequisites first** (signed firmware, A/B partitions, mandatory
+   flag). Dominates any fleet-safety conversation; do before either
+   delivery path.
+2. **Option C as near-term emergency button.** Ship a rate-limited admin
+   script once prerequisites are in. Covers the "urgent exception" use
+   case today with zero new infrastructure.
+3. **Option A when fleet reaches ~100 devices or Phase 3 lands** (item
+   3.5 already references IoT Jobs). At that scale the script's lack of
+   abort / observability starts to bite.
+4. **Skip Option B** as a primary path. Dangerous for a life-safety
+   product.
+
+---
+
+## Multi-Carrier LTE / Runtime APN Configuration
+
+Today the firmware has a single compile-time APN (`tti-helper-iot/src/ttireader_modem.cpp:19` — `m2m.com.attz` = AT&T M2M). Switching carriers means editing the constant, rebuilding, and reflashing every device. Prerequisite for the LatAm expansion documented in `memory/project_latam_monitoring_product.md` since each target country typically means a different SIM/carrier (Telcel/Movistar/Claro in MX, Entel/Movistar/WOM in CL, Vivo/Claro/Tim in BR, etc.). One test already exists for Entel Chile (`imovil.entelpcs.cl`, commented-out line at the same location).
+
+### Design options
+
+**Option A — BLE provisioning accepts APN (MVP)**
+- Extend the BLE protocol (currently `A:<pin>`, `S:<ssid>`, `P:<password>`) to also accept:
+  - `G:<apn>` — APN string
+  - `GU:<user>`, `GP:<password>` — optional GPRS credentials
+- Store in NVS like WiFi creds; modem reads APN from NVS on connect, falls back to compile-time default if empty.
+- Mobile "Provision WiFi" sheet grows an optional APN field.
+- ~50 LOC firmware + small mobile change.
+
+**Option B — MQTT `SETUP_APN` command (companion to A)**
+- New command on `cmd/esp32/ttireaderv1/{thingID}` (same pattern as existing `SETUP_UART`):
+  ```json
+  { "command": { "name": "SETUP_APN", "apn": "imovil.entelpcs.cl" } }
+  ```
+- Writes NVS, reconnects modem. Lets you fix "wrong SIM in that device" without a site visit.
+- Chicken-and-egg: only works when device is already online, so always a companion to A, not a replacement.
+
+**Option C — IMSI-based auto-detection (polish for scale)**
+- On boot, read IMSI via `sim_modem.getIMSI()`; leading digits encode MCC+MNC (country + carrier).
+- Match against a small in-firmware table (AT&T US, Entel CL, Telcel MX, Hologram, Twilio Super SIM, ...) → auto-select APN.
+- Fall back to NVS (set by A/B) → fall back to compile-time default.
+- ~100 LOC + an IMSI table that grows as you enter new markets.
+- Only worth it once per-device APN entry becomes operational pain (3+ carriers in the field).
+
+### Recommended execution order
+
+1. **Phase 1** — ship Options A + B together. Covers every current and near-term multi-carrier need (US AT&T M2M + Chile Entel test + any new LatAm country via reprovisioning). Trivial to do them together since B reuses A's NVS handler.
+2. **Phase 2** — add Option C once the fleet spans 3+ carriers and installers need a zero-config workflow. Defer until real operational pain justifies the table-maintenance burden.
+
+### Hardware caveat (purchasing, not firmware)
+
+Multi-carrier ≠ multi-region in hardware. LilyGO-T-SIM7600 comes in regional variants (NA / EU / LA / G-global) with different LTE band support. For one firmware + one SKU across US and LatAm, procure the **SIM7600G (global)** variant going forward. Confirm which variant the currently-deployed units carry before assuming they'll roam internationally.
+
+### Doc drift to clean up when touching this
+
+- `tti-helper-iot/doc/PROJECT_OVERVIEW.md` still references "SIM800" in a couple of places. Code is on SIM7600 (`TINY_GSM_MODEM_SIM7600`). Fix when editing modem code.
 
 ---
 
