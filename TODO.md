@@ -2,11 +2,11 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(14) ready to build/upload
+## 0. In flight — TestFlight 1.0.0(14) released to App Store Connect, awaiting field test
 
 **Local state as of 2026-04-30:**
-- `pubspec.yaml` is `1.0.0+14`. HEAD on `tti-helper-mobile/main` is `39a882d` (4 prior commits unpushed: `35e76a5`, `eb56572`, `610eba1`, `fd238e0`).
-- (14) IPA **not yet built** — `flutter build ipa` will overwrite the (13) IPA on disk. Build before next Transporter upload.
+- `pubspec.yaml` is `1.0.0+14`. HEAD on `tti-helper-mobile/main` is `39a882d`.
+- (14) IPA built and uploaded to App Store Connect via Transporter on 2026-04-30. 6 commits on `tti-helper-mobile/main` still unpushed to GitHub.
 
 **Commits landed for (14):**
 - `313455f` — `fix(estio): DSBL/TEST enter active map; accept S+H multi-criteria code`
@@ -17,7 +17,7 @@
 - (11) — Hybrid EST iO pairing (wrong direction — superseded by (12)).
 - (12) — EST iO pairing direction corrected; `descriptionFirst => false` for all models. Field-tested 2026-04-29.
 - (13) — Bundled: `_classify()` Battery Missing/Power Loss/etc descriptor pairing + full EST iO parser rewrite (17 STATUS codes, 4 address formats, iO64/iO500 + iO64/iO1000 split) + one-shot `estIO1000` → `estIO500` SharedPrefs migration. Released + field-tested 2026-04-29..30. Two issues surfaced (both addressed in (14)).
-- (14) — DSBL/TEST mapping fix + S+H multi-criteria detector code. **IPA not yet built**; awaiting upload.
+- (14) — DSBL/TEST mapping fix + S+H multi-criteria detector code. Released 2026-04-30; awaiting field test.
 
 **Permanent fixes already in place (won't repeat):**
 - `ITSAppUsesNonExemptEncryption=false` in `Info.plist` — no Export Compliance prompt on any build.
@@ -26,9 +26,10 @@
 - [ ] Replace iOS launch image — currently the default Flutter placeholder (flagged at every `flutter build ipa`). Not blocking for TestFlight, but **required before App Store Production submission**. Asset lives at `ios/Runner/Assets.xcassets/LaunchImage.imageset/`.
 
 **Resumption checklist for (14):**
-- [ ] `flutter build ipa` (overwrites (13) on disk).
-- [ ] Upload `1.0.0(14)` IPA via Transporter.
-- [ ] Assign (14) to Internal + External groups.
+- [x] `flutter build ipa` 2026-04-30.
+- [x] Upload `1.0.0(14)` IPA via Transporter 2026-04-30.
+- [ ] Assign (14) to Internal + External groups (if not already on auto-assign).
+- [ ] Push 6 unpushed commits on `tti-helper-mobile/main` to GitHub.
 - [ ] Field-test on EST iO bench:
   - Trigger a Smoke + Heat detector at `L:1 D:001` — `S+H ACT` should appear in Active under the **Alarm** bucket with description "Smoke + Heat" (or the panel's custom descriptor if line2 is supplied). After `S+H RST`, the row should leave Active.
   - Trigger DSBL on a device (disable a pull station) — `DSBL ACT` should appear in Active under **Others**. After re-enabling (`DSBL RST`), the row should leave Active.
