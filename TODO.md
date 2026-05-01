@@ -2,53 +2,65 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(16) — Notifier parser manual-driven rebuild
+## 0. In flight — TestFlight 1.0.0(16) — Notifier parser rebuild + brand-mark icon, uploaded 2026-05-01, awaiting bench-test on Notifier panels
 
 **Local state as of 2026-05-01:**
-- `pubspec.yaml` is `1.0.0+15` (will bump to `1.0.0+16` once the parser rewrite + tests pass).
-- HEAD on `tti-helper-mobile/main` is `8303fd2`, **2 commits unpushed** to origin (`5c13b38` icons + `8303fd2` bump from (15)). Push at next mobile commit.
-- (15) released and field-tested 2026-05-01 — launcher icon (bell+gear+check on green) confirmed on physical device. No functional regression vs (14).
+- `pubspec.yaml` is `1.0.0+16`. HEAD on `tti-helper-mobile/main` is `7d4458e`, all commits pushed to origin.
+- (16) IPA built 2026-05-01 18:32 at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa` (~43.6 MB). Uploaded to App Store Connect via Transporter the same day; processing started 18:34.
+- (15) released and field-tested 2026-05-01 (icon-only swap; superseded visually by (16)).
 
-**Plan for (16):** Manual-driven rewrite of the Notifier FACP parser. Replaces the bench-calibrated `notify360_parser.dart` (single 2026-04-03 calibration session, gaps in Pre-Alarm / Disabled Points / Fire Control / CO Alarm / MN family / structured address+zone extraction / multi-line trouble form). Mirrors the EST iO refactor from (13). User services NFS-320, NFS-640, AND NFS2-640 panels — needs all three covered. "notify360" is not a real Notifier product (typo or shorthand from the 2026-04-03 session that stuck in the code).
+**(16) ships two changes bundled:**
+1. **Notifier parser manual-driven rewrite** — replaces the bench-calibrated `notify360_parser.dart` (single 2026-04-03 calibration session) with a banner-driven implementation per `tti-helper-mobile/docs/notifier_protocol.md`. Sourced from the canonical NFS-320-E (doc 52747) and NFS2-640-E (doc 52743) operations manuals. Format-identity finding: NFS-320 / NFS-640 / NFS2-640 share an identical event format; one `NotifierParser` covers all three families. New coverage over the bench-calibrated body: Pre-Alarm (`PREALM` → active), Disabled Points (`DISABL` → trouble), 640-only Mass Notification banners (`ALARM: ECS/MN`, `ACTIVE: ECS/MN`, `TROUBL: ECS/MN`), CO alarm (`ALARM: CO`), Active Fire Control, multi-line printer trouble form (`MODULE ADDRESS` keyword), `facpTime` extraction (HH:MMa MMDDYY → DateTime), and address-based `incidentKey` (`<L>M<NNN>` / `<L>D<NNN>` / `B<NN>`) with body-key fallback for address-less system-trouble lines. UI bucketing convention preserved: `ACTIVE`-prefix events still classify as `FacpEventType.active` (no scattering across security/supervisory).
+2. **Launcher icon swap** — replaces the (15) bell+gear+checkmark placeholder with the official TTI brand mark (white shield with TTI lettering + flame curl, on green field). Sourced from `TTI-Icons/TTI-Icon2.jpeg` via the same recipe as (15).
 
-Manual sources in `tti-helper-mobile/facp_manual/Notifier/`:
-- `NFS-320-E-Operation Manual.pdf` (doc 52747, 2011) — canonical for NFS-320 family
-- `NFS2-640-E-Operation Manual.pdf` (doc 52743, 2013) — canonical for NFS2-640 family
-- Installation manuals (52745 / 52741) — secondary
-- `NFS-640-Programming Manual.pdf` (doc 51333, 2003, legacy) — set aside; `notifierNfs640` enum still routes to the same parser (DPI-232 interface 51499 is shared across the family)
+**`FacpModel` rename (breaking-but-migrated):** `notify360` → three values (`notifierNfs320`, `notifierNfs640`, `notifierNfs2640`). Existing installs migrate silently to `notifierNfs2640` (B-default-modern) on first launch via `migrateLegacyNotifierRename` in `device_facp_config.dart`; users can switch in Device Management. Marker key `facp_model_migration_v16_notifier_rename`. Mirrors the (13) `estIO1000` → `estIO500` pattern.
 
-Format-identity finding (side-by-side compare 2026-05-01): NFS-320 and NFS2-640 use **identical** event format (banners, type codes, address/zone, time/date, multi-line trouble form). 640-only additions are purely additive — no banner conflicts. **One `NotifierParser` covers all three.**
+**Test posture:** parser tests grew from 15 → 38 (23 new manual-cited fixtures); full mobile suite 176 → 199 passing. `flutter analyze` clean.
 
-**Locked decisions:**
-- Architecture: one `NotifierParser`, model-agnostic core.
-- `FacpModel` enum: replace `notify360` with three values — `notifierNfs320`, `notifierNfs640`, `notifierNfs2640` — all dispatching to the same parser. Display labels: `'Notifier NFS-320'` / `'Notifier NFS-640'` / `'Notifier NFS2-640'` (matches existing brand+model convention).
-- File rename: `lib/core/facp/parsers/notify360_parser.dart` → `notifier_parser.dart`; `Notify360Parser` → `NotifierParser`.
-- SharedPrefs migration: B-default-modern — `notify360` → `notifierNfs2640` silently on first launch (one-shot, idempotent; mirrors the `estIO1000` → `estIO500` migration from (13)).
-- Bench coverage: user will verify on NFS-320, NFS-640, AND NFS2-640 panels (multiple clients across all three).
-
-**7-step execution plan:**
-1. **Write the protocol reference doc** — new `tti-helper-mobile/doc/notifier_protocol.md`. Captures the 11 status banners (`SYSTEM NORMAL` · `ALARM:` · `TROUBL` · `ACTIVE` · `ACTIVE SECURITY` · `ACTIVE FIRE CONTROL` · `ACTIVE TAMPER` · `PREALM` · `DISABL` · `ACKNOWLEDGE` · `SIGNALS SILENCED`); Fire / Security / Supervisory / CO / Non-Alarm / MN type code tables; address formats (`MNNN`, `DNNN`, `BNN`, multi-line `MNNN ZNN OPEN CIRCUIT`); zone (`ZNNN`); time/date (`HH:MMa/p MMDDYY`); Pre-Alarm percentage (`055%/4`); 320-vs-640 deltas (MN family, DVC troubles, MNS outputs, paging codes). Standalone commit before any parser code.
-2. **Update `FacpModel` enum** in `lib/core/facp/facp_model.dart`. Remove `notify360`. Add `notifierNfs320`, `notifierNfs640`, `notifierNfs2640` with the display strings above. Keep `expectsPairs` and `descriptionFirst` returning `false`.
-3. **Rewrite the parser** — rename file/class, replace body with manual-driven implementation: banner-based event classification, structured type code / zone / address extraction, multi-line trouble support, MN / Pre-Alarm / Disabled / Fire-Control handling, CO Alarm differentiation. Keep existing `FacpEvent` model.
-4. **Update parser dispatcher** — wherever `FacpModel` is switched onto a parser (likely `facp_parser.dart` or alarm/event provider), route all three new enum values to the same `NotifierParser` instance. Remove the `notify360` branch.
-5. **SharedPrefs migration** — mirror the (13) `estIO1000` → `estIO500` migration (`fd238e0`). Marker key `facp_model_migration_v16_notifier_rename`. Idempotent.
-6. **Tests** — port existing `notify360_parser` tests to `notifier_parser_test.dart`. Add coverage for each banner, each event family, each address format, multi-line trouble, MN events, Pre-Alarm percentage, CO alarm. Maintain 171+ passing.
-7. **Build, bench-verify, ship** — bump pubspec to `1.0.0+16`, `flutter build ipa`, upload via Transporter, install + bench-verify on NFS-320 / NFS-640 / NFS2-640 panels, External submission with "What to Test" notes per the standing rule.
+**Commits landed for (16) (all on `tti-helper-mobile/main`, pushed):**
+- `bb845f1` `docs(facp): add Notifier RS-232 protocol reference (NFS-320 / NFS-640 / NFS2-640)`
+- `a72c705` `docs(facp): lock CLR ACT/TB concatenated form as confirmed bench behavior`
+- `c4c5e6f` `refactor(facp): split notify360 into notifierNfs320/640/2640 (steps 2/4/5 + rename half of 3)`
+- `6d623e4` `refactor(facp): rewrite NotifierParser body manual-driven (step 3b)`
+- `699ed60` `test(facp): expand NotifierParser coverage to manual fixtures (step 6)`
+- `38b13ba` `chore(icons): switch launcher icon to TTI shield+flame brand mark`
+- `7d4458e` `chore: bump build to 1.0.0+16`
 
 **Build history on App Store Connect (recent):**
 - (10) — History-page event ordering under panel burst; firmware v1.0.7 OTA companion (UART 256 B → 4 KB drain-per-tick). Field-tested.
 - (11) — Hybrid EST iO pairing (wrong direction — superseded by (12)).
 - (12) — EST iO pairing direction corrected; `descriptionFirst => false` for all models. Field-tested 2026-04-29.
-- (13) — Bundled: `_classify()` Battery Missing/Power Loss/etc descriptor pairing + full EST iO parser rewrite (17 STATUS codes, 4 address formats, iO64/iO500 + iO64/iO1000 split) + one-shot `estIO1000` → `estIO500` SharedPrefs migration. Released + field-tested 2026-04-29..30. Two issues surfaced (both addressed in (14)).
+- (13) — Bundled: `_classify()` Battery Missing/Power Loss/etc descriptor pairing + full EST iO parser rewrite (17 STATUS codes, 4 address formats, iO64/iO500 + iO64/iO1000 split) + one-shot `estIO1000` → `estIO500` SharedPrefs migration. Released + field-tested 2026-04-29..30.
 - (14) — DSBL/TEST mapping fix + S+H multi-criteria detector code. Released + field-tested 2026-04-30.
-- (15) — Launcher icon refresh (TTI bell+gear+check on green). No functional changes. **Released + field-tested 2026-05-01.**
+- (15) — Launcher icon refresh (bell+gear+check on green). Released + field-tested 2026-05-01.
+- (16) — Notifier parser manual-driven rebuild + TTI shield+flame brand-mark icon. **Uploaded 2026-05-01 18:34; awaiting bench-test on Notifier panels.**
 
 **Permanent fixes already in place (won't repeat):**
 - `ITSAppUsesNonExemptEncryption=false` in `Info.plist` — no Export Compliance prompt on any build.
-- App icon (resolved in (15)) — `flutter_launcher_icons` wired in `pubspec.yaml`; master at `assets/icon/appicon-1024.png`. To replace in future, drop a new 1024×1024 PNG (or square JPEG) at that path and run `dart run flutter_launcher_icons`.
+- App icon master swap recipe: drop a new 1024×1024 PNG (or square JPEG) at `assets/icon/appicon-1024.png` and run `dart run flutter_launcher_icons`.
 
 **Outstanding pre-Production gate (still not done):**
 - [ ] Replace iOS launch image — currently the default Flutter placeholder (flagged at every `flutter build ipa`). Not blocking for TestFlight, but **required before App Store Production submission**. Asset lives at `ios/Runner/Assets.xcassets/LaunchImage.imageset/`.
+
+**Resumption checklist for (16):**
+- [x] All 7 implementation steps merged (protocol doc + parser body rewrite + tests + icon swap + pubspec bump).
+- [x] `flutter build ipa` 2026-05-01 18:32.
+- [x] Upload via Transporter 2026-05-01 18:34. Transporter sidebar shows the (15) icon next to the (16) entry — known cache behavior; the embedded IPA contains the new icon and App Store Connect will show it once processing finishes.
+- [ ] Install (16) from sideload (or TestFlight once processed) and confirm new shield+flame icon on home screen, app switcher, Spotlight, Settings.
+- [ ] Bench-verify the parser on Notifier panels: trigger fire alarm, trouble, supervisory, security, pre-alarm, disabled point, CO (if available), system reset, system normal — confirm correct Active/History display and CLR pairing on each.
+- [ ] Bench-verify on NFS-320 if accessible; NFS-640 if accessible; NFS2-640 (current bench panel).
+- [ ] Confirm legacy `notify360` device entries silently migrate to `notifierNfs2640` after first launch.
+- [ ] If any divergence from manual-driven behavior surfaces, capture the raw line (CloudWatch or History row) — fixtures go into `notifier_parser_test.dart` for (17).
+
+**"What to Test" notes for the (16) External submission:**
+
+Build 1.0.0 (16) ships two changes:
+
+(1) The launcher icon is replaced with the official TTI brand mark — a white shield with TTI lettering and a flame curl on a green background. After installing, please confirm the new icon shows up on your home screen, in the app switcher, in Spotlight search, and in Settings under TTI Helper.
+
+(2) The parser for Notifier fire alarm panels (NFS-320 / NFS-640 / NFS2-640 families) has been rewritten to follow the official Notifier operations manuals. If you are testing on a Notifier panel, please trigger fire alarms, troubles, supervisory events, security events, pre-alarm warnings, and disabled points, and confirm each event displays correctly in the Active and History views. Also confirm that clears match their original events (a CLR TB clearing its TROUBLE, a CLR ACT clearing its ACTIVE), and that a SYSTEM RESET silences alarms while leaving troubles in place, while SYSTEM NORMAL clears everything. The panel model picker in Device Management now shows three Notifier options (NFS-320, NFS-640, NFS2-640) instead of one combined option — your existing selection automatically migrates to NFS2-640; switch in Device Management if you have an NFS-320 or NFS-640 panel.
+
+Non-Notifier panels (Fire-Lite, Vigilant, EST iO) are unchanged from build (15) and do not need re-testing.
 
 ## 0b. Backlog — not bound to (16)
 
