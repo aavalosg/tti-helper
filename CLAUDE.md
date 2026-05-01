@@ -10,11 +10,17 @@ For single-project work, `cd` into the relevant subfolder and run Claude there.
 
 When Claude is invoked in this parent directory, begin every conversation with a brief status report:
 
-1. Run `git status -s` and `git log @{u}..HEAD --oneline` inside each of `tti-helper-iot/`, `tti-helper-mobile/`, and `tti-helper-aws/` — summarize any uncommitted changes and unpushed commits per repo. If a repo is clean and in sync, say so in one line.
-2. Read `TODO.md` (sibling to this file) and show the current next-steps list.
-3. Keep the summary tight — one short section per repo, then the TODO list. No extra commentary until the user asks.
+1. **Establish ground truth for the current mobile build first** — TODO.md is a hand-edited note and frequently lags behind reality. Read `tti-helper-mobile/pubspec.yaml` for the `version:` line, note the mtime of `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`, and check the latest 1–2 commits in `tti-helper-mobile`. The combination is authoritative for which build is current.
+2. Run `git status -s` and `git log @{u}..HEAD --oneline` inside each of `tti-helper-iot/`, `tti-helper-mobile/`, and `tti-helper-aws/` — summarize any uncommitted changes and unpushed commits per repo. If a repo is clean and in sync, say so in one line.
+3. Read `TODO.md` (sibling to this file). **Cross-check § 0 against step 1: if TODO.md's in-flight build number, "awaiting upload" status, or "field test pending" status disagrees with the repo, flag the discrepancy explicitly at the top of the report — never silently restate TODO.md as fact.**
+4. If the user opens with a factual claim about build state ("we're on (N)", "we shipped X last session"), verify against step 1 *before* responding. If it conflicts, surface the conflict plainly instead of going along with the claim.
+5. Keep the summary tight — one short section per repo, then the TODO list with any discrepancies called out. No extra commentary until the user asks.
 
 If the user immediately asks a specific question, answer that first and fold the status report into the response only if relevant.
+
+## Closing the loop on a build
+
+When a build moves stages (uploaded → tested → released, or a new build is started), update TODO.md § 0 in the same session — don't leave it for "next time." The session-start ritual above only catches drift; it can't repair it without context that's already been lost.
 
 ---
 
