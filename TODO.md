@@ -2,7 +2,35 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(19) — migration type-cast hotfix on top of (16) parser rebuild, uploaded 2026-05-01, awaiting bench-test on Notifier panels
+## 0. In flight — TestFlight 1.0.0(21) — type-code-aware Notifier RESET wipe + per-parser docs
+
+**Local state as of 2026-05-01:**
+- `pubspec.yaml` is `1.0.0+21`. HEAD on `tti-helper-mobile/main` is `6ac1931`, all commits pushed to origin. (21) IPA NOT BUILT YET.
+- (19) field-tested 2026-05-01 — steps 1–4 of the test plan pass: launcher icon correct, Save Device ID + Save FACP Model both complete in <1 s, Notifier parser bench events render correctly. **(19) shipped clean — Notifier parser rebuild done.**
+- (20) was committed/pushed but never built. Replaced by (21) after I caught (with the user's verification of the latching list against the manual) that (20)'s wipe-by-FacpEventType rule was wrong twice over: (a) Notifier supervisories/security come through the ACTIVE banner so they're FacpEventType.active and (20)'s filter wasn't even hitting them; (b) within a bucket, latching/non-latching variants exist (TRACK SUPERV vs LATCH SUPERV; SUP.T* vs SUP.L*; EVACUATE SW non-latching per manual but bench-confirmed latching).
+
+## 0a. (21) implementation — type-code-aware latching attribute
+
+(21) replaces (20)'s bucket filter with a per-event latching attribute populated by the Notifier parser:
+
+- New `bool? latching` field on `FacpEvent`.
+- `NotifierParser` stamps the attribute via `_classifyLatching` from a manual-cited type-code lookup table (~70 entries) covering Tables 3.1 / 3.2 / 3.3 / 3.4 / 3.6, with bench/engineering overrides:
+  - **EVACUATE SW + SECOND SHOT** → latching (manual: N — bench-confirmed 2026-05-01)
+  - **HOLD UP** → latching (engineering team — not in §3 type-code tables)
+- Both dotted (`SUP.L`) and dotless (`SUPL`) detector code spellings accepted (manual is inconsistent across Table 3.4).
+- Bare `CO ` (Fig 3.16) recognized as latching.
+- DISABL events forced to `latching = false` (RESET doesn't clear admin-disabled points; panel re-emits while still disabled).
+- system / troubleRestore events get `latching = null` (irrelevant).
+- alarm_provider Notifier RESET branch becomes `_activeMap.removeWhere((_, v) => v.latching == true)`.
+
+Per-parser documentation also added in `tti-helper-mobile/docs/`:
+- `parsers_README.md` (index + cross-cutting state-machine notes)
+- `notifier_parser.md` (testing-oriented guide, complements existing `notifier_protocol.md`)
+- `firelite_9050_parser.md`, `estio_parser.md`, `vigilant_vm1_parser.md` (first-cut for those families).
+
+220/220 mobile tests pass (parser tests grew to 67 with 16 new latching cases; alarm_active_map tests grew to 17 with 5 new RESET-by-latching cases).
+
+## 0z. (19) closeout (historical) — Notifier parser manual-driven rebuild + brand-mark icon, uploaded 2026-05-01, FIELD-TESTED OK
 
 **Local state as of 2026-05-01:**
 - `pubspec.yaml` is `1.0.0+19`. HEAD on `tti-helper-mobile/main` is `08a5fe4`, all commits pushed to origin.
