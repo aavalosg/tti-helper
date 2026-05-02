@@ -2,24 +2,33 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(22) — SYSTEM NORMAL counter fix, IPA built 2026-05-02 14:40, awaiting upload
+## 0. In flight — TestFlight 1.0.0(23) — Notifier NFS-3030 family parser, IPA building 2026-05-02, ready for upload
 
 **Local state as of 2026-05-02:**
-- `pubspec.yaml` is `1.0.0+22`. (22) IPA built 2026-05-02 14:40 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Not yet uploaded to TestFlight; not yet committed/pushed.
-- (21) bench-tested 2026-05-02. Three findings:
-  1. **SECOND SHOT** — confirmed: panel wipes on RESET (mobile mirrors via `latching = true`). No code change needed; (21) behavior is correct. Re-verify on (22) bench.
-  2. **SYSTEM NORMAL counter regression** — when SYSTEM NORMAL arrives, the Active badge + "All" / "Others" chips were showing 1 (counting the synthetic placeholder). User wants 0. **Fixed in (22).**
-  3. **iO1000 stuck trouble** — A:001 trouble didn't clean after RST; suspect orphaned-descriptor pairing path (header arrived without descriptor or vice-versa, becoming an unstructured SYSTEM event). **DEFERRED to a later build** — needs CloudWatch raw lines or simulator log capture for root-cause confirmation before fixing.
+- `pubspec.yaml` is `1.0.0+23`. (23) IPA built 2026-05-02 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Ready to upload to TestFlight via Transporter.
+- (22) shipped as code+commit only — `flutter build ipa` ran but the IPA was NOT uploaded to TestFlight per user decision; (22)'s SYSTEM NORMAL counter fix gets implicit verification as part of (23) bench-test (which it received and passed).
 
-**(22) implementation — SYSTEM NORMAL placeholder is visible but uncounted (Option A):**
-- New helper `isNotifierSystemNormalPlaceholder(FacpEvent)` in `lib/features/alarms/data/alarm_provider.dart`. Active-map invariant: only system-typed events ever added to `_activeMap` are these placeholders, so a `type == FacpEventType.system` check is sufficient.
-- `lib/features/alarms/presentation/main_shell.dart` — Active-tab badge filters the placeholder out of the count (`activeCount` now uses `where(!isNotifierSystemNormalPlaceholder).length`).
-- `lib/features/alarms/presentation/active_events_screen.dart` — `EventBucketFilterBar` receives a filtered `eventTypes` list so the "All" and "Others" chip counts also exclude the placeholder.
-- `test/alarms/alarm_active_map_test.dart` — 2 new tests under group "Notifier rule 2": (a) placeholder remains visible but `where(!isPlaceholder)` is empty; (b) two real troubles count as 2, then SYSTEM NORMAL drops countable to 0.
-- 222/222 mobile tests pass (was 220 pre-(22)). `flutter analyze` clean of new issues.
+**(23) implementation — new `NotifierNfs3030Parser` for the 3030 wire format:**
+- Two new `FacpModel` enum values: `notifierNfs3030` (legacy 2003 panel) and `notifierNfs2_3030` (newer NFS2-3030/E). Both use the same parser. Picker grows from 8 → 10 entries.
+- New `lib/core/facp/parsers/notifier_nfs3030_parser.dart` (~380 lines). Handles:
+  - Banner verbs: bare/`ACKNOWLEDGED`/`ACKED`/`CLEARED` (class-specific — `ACKNOWLEDGED` for alarm-class, `ACKED` for trouble/supervisory).
+  - Banner classes: FIRE ALARM, SECURITY ALARM, TROUBLE (with detail field), SUPERVISORY, plus defensive support for CO ALARM, MN ALARM, PREALARM, CO PREALARM not yet bench-observed.
+  - Line-2 forms: B1 (`Zone <label> <code> <type_code> [L]? <time> <date> <addr>`), B2 (blank pad + timestamp), B3 (operator + timestamp).
+  - Single-line system commands: SYSTEM RESET, SYSTEM NORMAL, TTI connected.
+  - Inline `L` latching marker — no manual-cited table (huge simplification vs (21)).
+  - Year-2015 panel-clock guard: `facpTime` returns null when extracted year < 2020.
+  - ACK verbs route to `FacpEventType.system` so they bypass the active map and land in History only — same convention as `NotifierParser` for the 320/640 family.
+- `_classify` in `alarm_provider.dart` extended to recognize 3030 banner words so banners route into the seqnbr-paired buffer (same EST iO path).
+- `isNotifierFamily` extended to include both 3030 enums — gets the SYSTEM NORMAL placeholder behavior + the (22) badge=0 counter fix automatically.
+- 30 new tests in `test/facp/notifier_nfs3030_parser_test.dart`. Total: 252/252 mobile tests pass (was 222 pre-(23)). `flutter analyze` clean of new issues.
 
-**3030 bench dump (capturing in parallel during this session):**
-Simulator running with FACP model = "Unknown / Generic" and Device ID = bench 3030 thingID. Raw MQTT lines tee'd to `tti-helper-mobile/facp_manual/Notifier/bench_3030_raw/raw_<timestamp>.log`. Captured dump is the input for the (23) Notifier 3030 parser work — see memory `project_build_22_notifier_3030_plan.md`.
+**(23) bench-verified 2026-05-02:** Active+ACK+CLEAR lifecycles for SUPERVISORY/FIRE ALARM/TROUBLE; SYSTEM RESET cascade (RESET → per-event CLEAREDs → SYSTEM NORMAL); 8-event burst with ACK followups; SYSTEM NORMAL placeholder visible with badge=0; ACK events confirmed History-only; address fallback via line-2 zone descriptor confirmed for events with custom point labels (no `Detector L01D###` prefix in the banner).
+
+**Known cosmetic gap (not blocking (23)):** A fourth line-2 form was observed during testing — `<spaces><type_code> <time> <date> <address>` (no `Zone Z001` prefix), e.g. `POWER MONITR 04:11:03P SAT MAY 02, 2026     L01M155`. The address still resolves correctly via the banner target's `_reAddress` fallback, so events land in Active fine. Only loss is that `POWER MONITR` doesn't appear in the description annotation. Add B4 form support to a follow-up build.
+
+## 0z(22). (22) closeout (historical) — SYSTEM NORMAL counter fix
+
+(22) shipped as code+commit only on 2026-05-02 — IPA built but NOT uploaded to TestFlight per user decision; the SYSTEM NORMAL counter fix gets implicit verification as part of (23) bench-test (which it received and passed). One behavior change: synthetic SYSTEM NORMAL placeholder in the active map is now filtered out of the badge counter and bucket-filter "All"/"Others" chips via the new `isNotifierSystemNormalPlaceholder()` helper. Placeholder remains visible in the Active list as the explicit "all clear" indicator. Active-map invariant: only system-typed events ever reach `_activeMap` are these placeholders, so a `type == FacpEventType.system` check is sufficient. 222/222 tests passed pre-(23).
 
 ## 0z(21). (21) closeout (historical) — type-code-aware Notifier RESET wipe
 
