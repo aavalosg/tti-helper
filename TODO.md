@@ -2,12 +2,12 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(25) — AppBar refresh fix on top of (24), IPA building 2026-05-02
+## 0. In flight — TestFlight 1.0.0(25) — AppBar refresh fix on top of (24), IPA built 2026-05-02 18:03, awaiting upload
 
 **Local state as of 2026-05-02:**
-- `pubspec.yaml` is `1.0.0+25`. (25) IPA building. Same code as (24) plus a one-line fix: `ref.invalidate(deviceFacpConfigProvider)` in the picker save flow so the Welcome / MainShell AppBar consumers actually see the new model after a CHANGE save (the cached DeviceFacpConfig wrapper instance never changed identity, so `ref.watch` skipped the rebuild even though SharedPreferences had the new value).
-- (24) was uploaded 2026-05-02 17:40 BUT has the AppBar-stale bug — the model name in the AppBar doesn't refresh until cold start. Functional but visually confusing. (25) supersedes it; once (25) is uploaded, (24) becomes a dead build in the TestFlight pipeline (Apple keeps it but testers won't choose it once a higher build is available).
-- (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser; bench-verified and shipped.
+- `pubspec.yaml` is `1.0.0+25`. (25) IPA built 2026-05-02 18:03 (~42.5 MB). Same code as (24) plus a one-line fix: `ref.invalidate(deviceFacpConfigProvider)` in the picker save flow so the Welcome / MainShell AppBar consumers actually see the new model after a CHANGE save (the cached DeviceFacpConfig wrapper instance never changed identity, so `ref.watch` skipped the rebuild even though SharedPreferences had the new value).
+- (24) was uploaded 2026-05-02 17:40 then **ABANDONED** by the user — has the AppBar-stale bug AND a re-upload of fixed code at version 24 is rejected by Apple ("bundle version must be higher"). User decided not to test (24); (25) supersedes it.
+- (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser. **Field-tested OK 2026-05-02** by user; ready to release.
 
 **(24) implementation — FACP model picker UX refactor + AppBar contextualization:**
 - Three new getters on `FacpModel`: `String get brand` (e.g. 'Notifier'), `String get shortName` (e.g. 'NFS2-3030'), `String get descriptionDetail` (the subtitle text moved off the Device Management + Provisioning screens). Plus top-level helpers `allBrands` (alphabetical with Unknown last) and `modelsByBrand(brand)` (newest-first within brand).
@@ -59,9 +59,9 @@ Press SYSTEM RESET on the panel. The panel sends per-event clears followed by a 
 
 Other panel families (Fire-Lite, Vigilant, EST iO, and the existing Notifier 320, 640, 2640) are unchanged from build (21).
 
-## 0z(23). (23) closeout (historical) — Notifier NFS-3030 family parser
+## 0z(23). (23) closeout (historical) — Notifier NFS-3030 family parser, FIELD-TESTED OK
 
-(23) shipped 2026-05-02. New `NotifierNfs3030Parser` for the 3030 wire format dialect: distinct verbs (ACKNOWLEDGED/ACKED/CLEARED), loop-prefixed addresses, two-line emit pattern (banner + zone-or-system descriptor, paired by seqnbr ~80–180 ms apart), inline `L` latching marker on the zone descriptor. Bench-verified on a real NFS2-3030 panel — full lifecycle (active / ACK / CLEAR / SYSTEM RESET cascade / SYSTEM NORMAL placeholder with badge=0) confirmed working. ACK verbs route to `FacpEventType.system` so they land in History only. 30 new tests; 252/252 passing pre-(24). IPA uploaded to TestFlight; awaiting field-test on physical device.
+(23) shipped + field-tested OK 2026-05-02. New `NotifierNfs3030Parser` for the 3030 wire format dialect: distinct verbs (ACKNOWLEDGED/ACKED/CLEARED), loop-prefixed addresses, two-line emit pattern (banner + zone-or-system descriptor, paired by seqnbr ~80–180 ms apart), inline `L` latching marker on the zone descriptor. Bench-verified on a real NFS2-3030 panel during the same session — full lifecycle (active / ACK / CLEAR / SYSTEM RESET cascade / SYSTEM NORMAL placeholder with badge=0) confirmed working. ACK verbs route to `FacpEventType.system` so they land in History only. 30 new tests; 252/252 passing pre-(24).
 
 ## 0z(22). (22) closeout (historical) — SYSTEM NORMAL counter fix
 
