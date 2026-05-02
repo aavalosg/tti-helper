@@ -2,10 +2,10 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(25) — AppBar refresh fix on top of (24), IPA built 2026-05-02 18:03, awaiting upload
+## 0. In flight — TestFlight 1.0.0(25) — AppBar refresh fix on top of (24), uploaded 2026-05-02, awaiting field-test
 
 **Local state as of 2026-05-02:**
-- `pubspec.yaml` is `1.0.0+25`. (25) IPA built 2026-05-02 18:03 (~42.5 MB). Same code as (24) plus a one-line fix: `ref.invalidate(deviceFacpConfigProvider)` in the picker save flow so the Welcome / MainShell AppBar consumers actually see the new model after a CHANGE save (the cached DeviceFacpConfig wrapper instance never changed identity, so `ref.watch` skipped the rebuild even though SharedPreferences had the new value).
+- `pubspec.yaml` is `1.0.0+25`. (25) IPA built 2026-05-02 18:03 (~42.5 MB) and uploaded to TestFlight the same evening; awaiting field-test on the iPhone via TestFlight install. Same code as (24) plus a one-line fix: `ref.invalidate(deviceFacpConfigProvider)` in the picker save flow so the Welcome / MainShell AppBar consumers actually see the new model after a CHANGE save (the cached DeviceFacpConfig wrapper instance never changed identity, so `ref.watch` skipped the rebuild even though SharedPreferences had the new value).
 - (24) was uploaded 2026-05-02 17:40 then **ABANDONED** by the user — has the AppBar-stale bug AND a re-upload of fixed code at version 24 is rejected by Apple ("bundle version must be higher"). User decided not to test (24); (25) supersedes it.
 - (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser. **Field-tested OK 2026-05-02** by user; ready to release.
 
