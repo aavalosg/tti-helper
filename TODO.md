@@ -2,10 +2,11 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(23) — Notifier NFS-3030 family parser, IPA building 2026-05-02, ready for upload
+## 0. In flight — TestFlight 1.0.0(23) — Notifier NFS-3030 family parser, uploaded 2026-05-02, awaiting field-test
 
 **Local state as of 2026-05-02:**
-- `pubspec.yaml` is `1.0.0+23`. (23) IPA built 2026-05-02 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Ready to upload to TestFlight via Transporter.
+- `pubspec.yaml` is `1.0.0+23`. (23) IPA built 2026-05-02 16:16 (~42.5 MB) and uploaded to TestFlight the same evening. Awaiting field-test on a NFS2-3030 panel via TestFlight install.
+- (23) was bench-verified during this session via the iPhone 16e simulator + real bench panel — full lifecycle (active / ACK / CLEAR / SYSTEM RESET cascade / SYSTEM NORMAL placeholder with badge=0) confirmed working. The TestFlight install adds the visual confirmation on the physical device + the App Store Connect "What to Test" testers, but the parser logic itself is already field-validated.
 - (22) shipped as code+commit only — `flutter build ipa` ran but the IPA was NOT uploaded to TestFlight per user decision; (22)'s SYSTEM NORMAL counter fix gets implicit verification as part of (23) bench-test (which it received and passed).
 
 **(23) implementation — new `NotifierNfs3030Parser` for the 3030 wire format:**
