@@ -2,16 +2,28 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(21) — type-code-aware Notifier RESET wipe + per-parser docs, uploaded 2026-05-01, awaiting bench-test
+## 0. In flight — TestFlight 1.0.0(22) — SYSTEM NORMAL counter fix, IPA built 2026-05-02 14:40, awaiting upload
 
-**Local state as of 2026-05-01:**
-- `pubspec.yaml` is `1.0.0+21`. HEAD on `tti-helper-mobile/main` is `6ac1931`, all commits pushed to origin. (21) IPA built 2026-05-01 22:49 (~43.6 MB) and uploaded to TestFlight the same evening; awaiting bench verification.
-- (19) field-tested 2026-05-01 — steps 1–4 of the test plan pass: launcher icon correct, Save Device ID + Save FACP Model both complete in <1 s, Notifier parser bench events render correctly. **(19) shipped clean — Notifier parser rebuild done.**
-- (20) was committed/pushed but never built. Replaced by (21) after I caught (with the user's verification of the latching list against the manual) that (20)'s wipe-by-FacpEventType rule was wrong twice over: (a) Notifier supervisories/security come through the ACTIVE banner so they're FacpEventType.active and (20)'s filter wasn't even hitting them; (b) within a bucket, latching/non-latching variants exist (TRACK SUPERV vs LATCH SUPERV; SUP.T* vs SUP.L*; EVACUATE SW non-latching per manual but bench-confirmed latching).
+**Local state as of 2026-05-02:**
+- `pubspec.yaml` is `1.0.0+22`. (22) IPA built 2026-05-02 14:40 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Not yet uploaded to TestFlight; not yet committed/pushed.
+- (21) bench-tested 2026-05-02. Three findings:
+  1. **SECOND SHOT** — confirmed: panel wipes on RESET (mobile mirrors via `latching = true`). No code change needed; (21) behavior is correct. Re-verify on (22) bench.
+  2. **SYSTEM NORMAL counter regression** — when SYSTEM NORMAL arrives, the Active badge + "All" / "Others" chips were showing 1 (counting the synthetic placeholder). User wants 0. **Fixed in (22).**
+  3. **iO1000 stuck trouble** — A:001 trouble didn't clean after RST; suspect orphaned-descriptor pairing path (header arrived without descriptor or vice-versa, becoming an unstructured SYSTEM event). **DEFERRED to a later build** — needs CloudWatch raw lines or simulator log capture for root-cause confirmation before fixing.
 
-## 0a. (21) implementation — type-code-aware latching attribute
+**(22) implementation — SYSTEM NORMAL placeholder is visible but uncounted (Option A):**
+- New helper `isNotifierSystemNormalPlaceholder(FacpEvent)` in `lib/features/alarms/data/alarm_provider.dart`. Active-map invariant: only system-typed events ever added to `_activeMap` are these placeholders, so a `type == FacpEventType.system` check is sufficient.
+- `lib/features/alarms/presentation/main_shell.dart` — Active-tab badge filters the placeholder out of the count (`activeCount` now uses `where(!isNotifierSystemNormalPlaceholder).length`).
+- `lib/features/alarms/presentation/active_events_screen.dart` — `EventBucketFilterBar` receives a filtered `eventTypes` list so the "All" and "Others" chip counts also exclude the placeholder.
+- `test/alarms/alarm_active_map_test.dart` — 2 new tests under group "Notifier rule 2": (a) placeholder remains visible but `where(!isPlaceholder)` is empty; (b) two real troubles count as 2, then SYSTEM NORMAL drops countable to 0.
+- 222/222 mobile tests pass (was 220 pre-(22)). `flutter analyze` clean of new issues.
 
-(21) replaces (20)'s bucket filter with a per-event latching attribute populated by the Notifier parser:
+**3030 bench dump (capturing in parallel during this session):**
+Simulator running with FACP model = "Unknown / Generic" and Device ID = bench 3030 thingID. Raw MQTT lines tee'd to `tti-helper-mobile/facp_manual/Notifier/bench_3030_raw/raw_<timestamp>.log`. Captured dump is the input for the (23) Notifier 3030 parser work — see memory `project_build_22_notifier_3030_plan.md`.
+
+## 0z(21). (21) closeout (historical) — type-code-aware Notifier RESET wipe
+
+(21) bench-tested 2026-05-02. SECOND SHOT confirmed wiped by RESET (no change). SYSTEM NORMAL counter regression → fixed in (22). iO1000 stuck trouble → deferred to a later build. (21) replaced (20)'s bucket filter with a per-event latching attribute populated by the Notifier parser:
 
 - New `bool? latching` field on `FacpEvent`.
 - `NotifierParser` stamps the attribute via `_classifyLatching` from a manual-cited type-code lookup table (~70 entries) covering Tables 3.1 / 3.2 / 3.3 / 3.4 / 3.6, with bench/engineering overrides:
