@@ -26,6 +26,16 @@
 
 **Known cosmetic gap (not blocking (23)):** A fourth line-2 form was observed during testing — `<spaces><type_code> <time> <date> <address>` (no `Zone Z001` prefix), e.g. `POWER MONITR 04:11:03P SAT MAY 02, 2026     L01M155`. The address still resolves correctly via the banner target's `_reAddress` fallback, so events land in Active fine. Only loss is that `POWER MONITR` doesn't appear in the description annotation. Add B4 form support to a follow-up build.
 
+**"What to Test" notes for the (23) External submission:**
+
+Build 1.0.0 (23) adds support for the Notifier NFS-3030 and NFS2-3030 fire alarm panels. Open Device Management and pick "Notifier NFS-3030" or "Notifier NFS2-3030" depending on your panel, then save.
+
+On the panel, trigger a trouble, alarm, or supervisory event. The event should appear in the Active list with the event name and address shown, and the count badge should go up by one. Press ACK on the panel and confirm the acknowledged version goes only to History without changing the Active row or the count. Clear the condition on the panel and confirm the row leaves Active and the count drops.
+
+Press SYSTEM RESET on the panel. The panel sends per-event clears followed by a System Normal message. The Active list should empty out and show only "SYSTEM NORMAL" with the count at zero.
+
+Other panel families (Fire-Lite, Vigilant, EST iO, and the existing Notifier 320, 640, 2640) are unchanged from build (21).
+
 ## 0z(22). (22) closeout (historical) — SYSTEM NORMAL counter fix
 
 (22) shipped as code+commit only on 2026-05-02 — IPA built but NOT uploaded to TestFlight per user decision; the SYSTEM NORMAL counter fix gets implicit verification as part of (23) bench-test (which it received and passed). One behavior change: synthetic SYSTEM NORMAL placeholder in the active map is now filtered out of the badge counter and bucket-filter "All"/"Others" chips via the new `isNotifierSystemNormalPlaceholder()` helper. Placeholder remains visible in the Active list as the explicit "all clear" indicator. Active-map invariant: only system-typed events ever reach `_activeMap` are these placeholders, so a `type == FacpEventType.system` check is sufficient. 222/222 tests passed pre-(23).
