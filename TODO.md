@@ -2,10 +2,10 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(21) — type-code-aware Notifier RESET wipe + per-parser docs
+## 0. In flight — TestFlight 1.0.0(21) — type-code-aware Notifier RESET wipe + per-parser docs, uploaded 2026-05-01, awaiting bench-test
 
 **Local state as of 2026-05-01:**
-- `pubspec.yaml` is `1.0.0+21`. HEAD on `tti-helper-mobile/main` is `6ac1931`, all commits pushed to origin. (21) IPA NOT BUILT YET.
+- `pubspec.yaml` is `1.0.0+21`. HEAD on `tti-helper-mobile/main` is `6ac1931`, all commits pushed to origin. (21) IPA built 2026-05-01 22:49 (~43.6 MB) and uploaded to TestFlight the same evening; awaiting bench verification.
 - (19) field-tested 2026-05-01 — steps 1–4 of the test plan pass: launcher icon correct, Save Device ID + Save FACP Model both complete in <1 s, Notifier parser bench events render correctly. **(19) shipped clean — Notifier parser rebuild done.**
 - (20) was committed/pushed but never built. Replaced by (21) after I caught (with the user's verification of the latching list against the manual) that (20)'s wipe-by-FacpEventType rule was wrong twice over: (a) Notifier supervisories/security come through the ACTIVE banner so they're FacpEventType.active and (20)'s filter wasn't even hitting them; (b) within a bucket, latching/non-latching variants exist (TRACK SUPERV vs LATCH SUPERV; SUP.T* vs SUP.L*; EVACUATE SW non-latching per manual but bench-confirmed latching).
 
