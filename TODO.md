@@ -2,12 +2,37 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(23) — Notifier NFS-3030 family parser, uploaded 2026-05-02, awaiting field-test
+## 0. In flight — TestFlight 1.0.0(24) — FACP picker + AppBar refactor, IPA built 2026-05-02 17:40, awaiting upload
 
 **Local state as of 2026-05-02:**
-- `pubspec.yaml` is `1.0.0+23`. (23) IPA built 2026-05-02 16:16 (~42.5 MB) and uploaded to TestFlight the same evening. Awaiting field-test on a NFS2-3030 panel via TestFlight install.
-- (23) was bench-verified during this session via the iPhone 16e simulator + real bench panel — full lifecycle (active / ACK / CLEAR / SYSTEM RESET cascade / SYSTEM NORMAL placeholder with badge=0) confirmed working. The TestFlight install adds the visual confirmation on the physical device + the App Store Connect "What to Test" testers, but the parser logic itself is already field-validated.
-- (22) shipped as code+commit only — `flutter build ipa` ran but the IPA was NOT uploaded to TestFlight per user decision; (22)'s SYSTEM NORMAL counter fix gets implicit verification as part of (23) bench-test (which it received and passed).
+- `pubspec.yaml` is `1.0.0+24`. (24) IPA built 2026-05-02 17:40 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Ready to upload to TestFlight via Transporter.
+- (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser is in the TestFlight pipeline; bench-verified and shipped.
+
+**(24) implementation — FACP model picker UX refactor + AppBar contextualization:**
+- Three new getters on `FacpModel`: `String get brand` (e.g. 'Notifier'), `String get shortName` (e.g. 'NFS2-3030'), `String get descriptionDetail` (the subtitle text moved off the Device Management + Provisioning screens). Plus top-level helpers `allBrands` (alphabetical with Unknown last) and `modelsByBrand(brand)` (newest-first within brand).
+- New file `lib/core/facp/presentation/facp_picker.dart` — `FacpBrandPickerScreen` and `FacpModelPickerScreen`. Brand picker has a search field that filters across brands + model names + descriptions; tapping a brand row pushes the model picker scoped to that brand. Search results in the brand picker show models grouped by brand, tap to save directly. Defensive try/catch + SnackBar around the save flow (mirrors the (18) `_saveDevice` guard).
+- Two new routes in `lib/core/router.dart`: `/facp-picker/brand` (extra: thingId) and `/facp-picker/model` (extra: `FacpModelPickerArgs`).
+- `device_management_screen.dart` — replaced inline `RadioListTile` block with a "Currently configured: X / CHANGE ›" InkWell that opens the picker. Removed dead code (`_saveModel`, `_modelSubtitle`, `_savingModel`). Section-header icons dropped; `_SectionHeader` simplified to title+subtitle only. New `_openFacpPicker` extends the active-session block (already on Device ID save) to FACP model save — dialog blocks change while a session is open.
+- `provisioning_screen.dart` — kept inline radio (lifecycle is different — no thingId yet), but swapped `_modelSubtitle` for `FacpModel.descriptionDetail` and dropped section-header icons.
+- `main_shell.dart` AppBar — drops "TTI Helper" brand title on contextual screens. Promotes session location to primary header. Shows `FacpModel.shortName` in accent green as subtitle (or "Generic parser" in dim gray if model is unknown). Async-load guard: subtitle hidden while `deviceFacpConfigProvider` is still loading on cold start, avoids the "Generic" → real-model flash.
+- `welcome_screen.dart` AppBar — keeps "TTI Helper" brand title (this is the workflow-selection home, no session yet) but adds the configured FACP model as a subtitle so the tech sees the bound panel before starting a session. Hidden when no device is configured.
+- Tests: 18 new unit tests on the new getters/helpers in `facp_model_test.dart`. Total 270/270 mobile tests pass (was 252 pre-(24)). `flutter analyze` clean of new issues. Widget tests deferred — codebase has no widget-test scaffolding yet, manual simulator verification covered the picker flow.
+
+**(24) bench-verified 2026-05-02 on the simulator** with build (24) installed. Welcome AppBar shows TTI Helper + NFS2-3030 in green. Other flows (CHANGE button → brand picker → model picker → Save → Device Management updates) tested visually.
+
+**Risk-class check vs (16) FACP-picker spinner regression:** (24) does NOT rename any enum values — no SharedPreferences migration code, no schema change, same `setString(key, model.name)` round-trip as today. The (16) bug class can't recur. New risk surface is navigation + async loading state, both mitigated (defensive try/catch + valueOrNull guard).
+
+**"What to Test" notes for the (24) External submission:**
+
+Build 1.0.0 (24) refreshes the Device Management screen and shows the configured FACP panel model on every screen.
+
+Open Device Management. The FACP Model section now shows "Currently configured: your panel name" with a CHANGE button. Tap CHANGE to open a brand picker (Fire-Lite, Edwards EST iO, Notifier, Vigilant, Unknown). Search for a brand or model from the search field at the top. Tap a brand to see its models. Pick a model and tap Save FACP Model — you return to Device Management with the new selection saved.
+
+The app bar across the Welcome, Active, and History screens now shows the connected panel model (for example NFS2-3030) in green, alongside the session location. This way you always know which panel the app is bound to without leaving the current screen.
+
+If you try to change the FACP model while a troubleshooting session is open, the app blocks the change with a dialog asking you to close the session first. This prevents the History from getting mixed events from two different parser dialects.
+
+No parser changes in this build. Active monitoring and event handling for all panel families (Fire-Lite, EST iO, Vigilant, and the existing Notifier 320, 640, 2640, 3030) are unchanged from build (23).
 
 **(23) implementation — new `NotifierNfs3030Parser` for the 3030 wire format:**
 - Two new `FacpModel` enum values: `notifierNfs3030` (legacy 2003 panel) and `notifierNfs2_3030` (newer NFS2-3030/E). Both use the same parser. Picker grows from 8 → 10 entries.
@@ -36,6 +61,10 @@ On the panel, trigger a trouble, alarm, or supervisory event. The event should a
 Press SYSTEM RESET on the panel. The panel sends per-event clears followed by a System Normal message. The Active list should empty out and show only "SYSTEM NORMAL" with the count at zero.
 
 Other panel families (Fire-Lite, Vigilant, EST iO, and the existing Notifier 320, 640, 2640) are unchanged from build (21).
+
+## 0z(23). (23) closeout (historical) — Notifier NFS-3030 family parser
+
+(23) shipped 2026-05-02. New `NotifierNfs3030Parser` for the 3030 wire format dialect: distinct verbs (ACKNOWLEDGED/ACKED/CLEARED), loop-prefixed addresses, two-line emit pattern (banner + zone-or-system descriptor, paired by seqnbr ~80–180 ms apart), inline `L` latching marker on the zone descriptor. Bench-verified on a real NFS2-3030 panel — full lifecycle (active / ACK / CLEAR / SYSTEM RESET cascade / SYSTEM NORMAL placeholder with badge=0) confirmed working. ACK verbs route to `FacpEventType.system` so they land in History only. 30 new tests; 252/252 passing pre-(24). IPA uploaded to TestFlight; awaiting field-test on physical device.
 
 ## 0z(22). (22) closeout (historical) — SYSTEM NORMAL counter fix
 
