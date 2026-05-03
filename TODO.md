@@ -2,10 +2,43 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(25) — AppBar refresh fix on top of (24), uploaded 2026-05-02, awaiting field-test
+## 0. In flight — TestFlight 1.0.0(26) — Fire-Lite MS-9600LS family + shared FireLiteParser, committed 2026-05-02, awaiting bench-verify before IPA build
 
 **Local state as of 2026-05-02:**
-- `pubspec.yaml` is `1.0.0+25`. (25) IPA built 2026-05-02 18:03 (~42.5 MB) and uploaded to TestFlight the same evening; awaiting field-test on the iPhone via TestFlight install. Same code as (24) plus a one-line fix: `ref.invalidate(deviceFacpConfigProvider)` in the picker save flow so the Welcome / MainShell AppBar consumers actually see the new model after a CHANGE save (the cached DeviceFacpConfig wrapper instance never changed identity, so `ref.watch` skipped the rebuild even though SharedPreferences had the new value).
+- `pubspec.yaml` is `1.0.0+26`. HEAD `2f2d1a3` — committed locally, NOT pushed yet, NO IPA built yet (deliberate: bench-verify on the running simulator before the build/upload).
+- (25) uploaded 2026-05-02 18:03 — AppBar refresh fix. Awaiting field-test.
+- (24) uploaded 2026-05-02 17:40 then **ABANDONED** (AppBar-stale bug + Apple version-collision blocking re-upload at v24).
+- (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser. **Field-tested OK 2026-05-02** by user; ready to release.
+
+**(26) implementation — Fire-Lite MS-9600LS family parser + shared `FireLiteParser`:**
+- One new `FacpModel` enum value: `firelite9600` (covers MS-9600LS / LSE / UDLS / UDLSE / LSC — all SKUs share the same wire format per the manual). Picker grows from 10 → 11 entries; newest-first order puts 9600 above 9050.
+- `lib/core/facp/parsers/firelite_9050_parser.dart` → `firelite_parser.dart`. Class `FireLite9050Parser` → `FireLiteParser`, constructor takes `FacpModel`. Same pattern as Notifier 320/640/2640 sharing `NotifierParser` and EST iO500/iO1000 sharing `EstIOParser`.
+- Bench-evidence basis: 31 events captured 2026-05-02 on a real MS-9600LS panel — full TROUBL/CLEARt/ACTIVE/CLEARe/ALARM:/CLEARa lifecycle, RESET cascade, OFF NORMAL pair, 4-NAC silencing. Saved to `facp_manual/Firelite/bench_9600_raw/raw_20260502_195435_build25.txt`. Verdict: 9050 + 9600 share an identical single-line printer/RS-232 wire format — confirmed against MS-9600LS Series Manual P/N 52646:B8 §4.4-4.6 + Table 3.1 (page 79).
+- New UI filter: `isFireLiteOffNormalPlaceholder()` in `alarm_provider.dart`. The 9600 emits `TROUBL IN SYSTEM OFF NORMAL MESSAGE` whenever any condition is active and `CLEARt` of same when normal — the panel's implicit "all clear" indicator. Filter excludes it from the badge count and bucket-filter chips so the user doesn't see N+1 troubles when N other faults exist; row stays visible in Active list. Mirrors the (22) Notifier SYSTEM NORMAL placeholder UX pattern.
+- `_reSupervBody` extended for MEDIC-ALERT / HAZARD-ALERT / TORNADO-ALERT (manual-cited supervisory-latching codes from Table 3.1).
+- Per user direction: PRE-ALARM and DSBL/disabled-point handling NOT implemented in (26) (deferred). PULL STATION uses the same path as 9050 (verb-routed via `ALARM:`).
+- Latching attribute stays null for Fire-Lite (RESET is a panel-spec no-op; panel-driven cascade does the clearing). Bench-reconfirmed 2026-05-02 on the 9600.
+- New parser doc: `docs/firelite_parser.md` (replaces `firelite_9050_parser.md` + `firelite_9050_9600_plan.md`). Manual-cited spec covering both panels + evidence-vs-inference table for 9600 features (MNS EVENT, HVAC OVRRIDE/RESTART listed as inferred-only — no printer-output sample in the manual, awaiting a panel with these programmed).
+- Tests: 50 fixtures total in `firelite_parser_test.dart` (15 ported 9050 + 30 new 9600 bench fixtures + 4 OFF NORMAL filter + 1 multi-loop address). `flutter analyze` clean of new issues. 293/293 mobile tests pass (was 270/270 pre-(26)).
+
+**(26) bench-verify checklist (next step before IPA build):**
+1. Hot-restart the running simulator (or restart `flutter run`) to load the new code.
+2. In Device Management, open the picker → pick **Fire-Lite MS-9600LS** → save.
+3. AppBar should show `MS-9600LS` in green.
+4. Trigger a trouble on the 9600 panel — confirm it appears in Active.
+5. Trigger a 2nd trouble — confirm badge says **2**, not 3 (OFF NORMAL is also in the list but uncounted).
+6. Press SYSTEM RESET on the panel — confirm cascade works (CLEARt per event + RESTOR + immediate re-fire if still physical).
+7. Trigger an alarm + ACK + observe pairing. Trigger a supervisory + ACTIVE/CLEARe pair.
+8. Switch model back to MS-9050 in the picker → confirm AppBar updates and 9050-shaped events still parse correctly (regression check).
+
+**"What to Test" notes for the (26) External submission (will write after bench-verify, before IPA build):**
+
+(Draft pending bench result.)
+
+## 0z(25). (25) closeout (historical) — AppBar refresh fix, uploaded 2026-05-02, awaiting field-test
+
+**Local state as of 2026-05-02:**
+- `pubspec.yaml` was `1.0.0+25`. (25) IPA built 2026-05-02 18:03 (~42.5 MB) and uploaded to TestFlight the same evening; awaiting field-test on the iPhone via TestFlight install. Same code as (24) plus a one-line fix: `ref.invalidate(deviceFacpConfigProvider)` in the picker save flow so the Welcome / MainShell AppBar consumers actually see the new model after a CHANGE save (the cached DeviceFacpConfig wrapper instance never changed identity, so `ref.watch` skipped the rebuild even though SharedPreferences had the new value).
 - (24) was uploaded 2026-05-02 17:40 then **ABANDONED** by the user — has the AppBar-stale bug AND a re-upload of fixed code at version 24 is rejected by Apple ("bundle version must be higher"). User decided not to test (24); (25) supersedes it.
 - (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser. **Field-tested OK 2026-05-02** by user; ready to release.
 
