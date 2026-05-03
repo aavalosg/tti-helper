@@ -2,10 +2,10 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(26) — Fire-Lite MS-9600LS family + shared FireLiteParser, committed 2026-05-02, awaiting bench-verify before IPA build
+## 0. In flight — TestFlight 1.0.0(26) — Fire-Lite MS-9600LS family + shared FireLiteParser, IPA built + uploaded 2026-05-02, awaiting field-test on physical 9600 panel
 
 **Local state as of 2026-05-02:**
-- `pubspec.yaml` is `1.0.0+26`. HEAD `2f2d1a3` — committed locally, NOT pushed yet, NO IPA built yet (deliberate: bench-verify on the running simulator before the build/upload).
+- `pubspec.yaml` is `1.0.0+26`. HEAD `2f2d1a3` (mobile) — pushed. (26) IPA built 2026-05-02 21:15 (~43.6 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa` and uploaded to TestFlight via Transporter the same evening. The simulator-only "connection unit test" passed; full lifecycle bench-verify deferred to the physical-FACP test on a real MS-9600LS panel via TestFlight install.
 - (25) uploaded 2026-05-02 18:03 — AppBar refresh fix. Awaiting field-test.
 - (24) uploaded 2026-05-02 17:40 then **ABANDONED** (AppBar-stale bug + Apple version-collision blocking re-upload at v24).
 - (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser. **Field-tested OK 2026-05-02** by user; ready to release.
@@ -21,19 +21,15 @@
 - New parser doc: `docs/firelite_parser.md` (replaces `firelite_9050_parser.md` + `firelite_9050_9600_plan.md`). Manual-cited spec covering both panels + evidence-vs-inference table for 9600 features (MNS EVENT, HVAC OVRRIDE/RESTART listed as inferred-only — no printer-output sample in the manual, awaiting a panel with these programmed).
 - Tests: 50 fixtures total in `firelite_parser_test.dart` (15 ported 9050 + 30 new 9600 bench fixtures + 4 OFF NORMAL filter + 1 multi-loop address). `flutter analyze` clean of new issues. 293/293 mobile tests pass (was 270/270 pre-(26)).
 
-**(26) bench-verify checklist (next step before IPA build):**
-1. Hot-restart the running simulator (or restart `flutter run`) to load the new code.
-2. In Device Management, open the picker → pick **Fire-Lite MS-9600LS** → save.
-3. AppBar should show `MS-9600LS` in green.
-4. Trigger a trouble on the 9600 panel — confirm it appears in Active.
-5. Trigger a 2nd trouble — confirm badge says **2**, not 3 (OFF NORMAL is also in the list but uncounted).
-6. Press SYSTEM RESET on the panel — confirm cascade works (CLEARt per event + RESTOR + immediate re-fire if still physical).
-7. Trigger an alarm + ACK + observe pairing. Trigger a supervisory + ACTIVE/CLEARe pair.
-8. Switch model back to MS-9050 in the picker → confirm AppBar updates and 9050-shaped events still parse correctly (regression check).
+**"What to Test" notes for the (26) External submission:**
 
-**"What to Test" notes for the (26) External submission (will write after bench-verify, before IPA build):**
+Build 1.0.0 (26) adds support for the Fire-Lite MS-9600LS family panels (MS-9600LS / LSE / UDLS / UDLSE / LSC). Open Device Management, tap CHANGE on the FACP Model row, and pick **Fire-Lite MS-9600LS** under the Fire-Lite brand. The app bar should immediately show "MS-9600LS" in green.
 
-(Draft pending bench result.)
+On the panel, trigger any combination of troubles, alarms, and supervisory events. Each one should appear in Active and the count badge should reflect the number of real conditions. Note that the panel also emits a summary "OFF NORMAL MESSAGE" whenever any condition is active — this row appears in the Active list as the panel's "all clear" indicator but is intentionally excluded from the count badge so you don't see N+1 troubles when N actual faults exist.
+
+Press ACK on the panel — Active list unchanged. Press SIGNAL SILENCE — Active list unchanged. Press SYSTEM RESET — the panel emits a per-event clear cascade followed by RESTOR; any still-physical conditions immediately re-fire as fresh troubles (this is the panel's normal behavior). Clear faults at the source and confirm matching CLEARt rows pair off correctly.
+
+Other panel families (MS-9050, Notifier 320/640/2640/3030, EST iO, Vigilant) are unchanged from (25). Switch the picker back to MS-9050 mid-session and confirm the existing 9050 lifecycle still works as before.
 
 ## 0z(25). (25) closeout (historical) — AppBar refresh fix, uploaded 2026-05-02, awaiting field-test
 
