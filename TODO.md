@@ -200,16 +200,81 @@ Non-Notifier panels (Fire-Lite, Vigilant, EST iO) are unchanged from build (15) 
 - [ ] **Messages lost while app is suspended (iOS standby)** — when the iPhone enters standby or the app is backgrounded, iOS suspends the process and the MQTT WebSocket connection drops; any alarms published during that window never reach the app on resume. Critical for a life-safety product. Likely path: route alarms through **APNs push notifications** (AWS IoT Rule → SNS → APNs) so the OS wakes the app/shows the alert independently of the in-app MQTT session. In-app MQTT then resyncs on foreground. Decide whether to keep MQTT for live foreground use only, or also add a "missed events since X" replay (retained MQTT or a tiny REST endpoint backed by IoT analytics / DynamoDB). Cross-repo: `tti-helper-mobile` + `tti-helper-aws`.
 
 - [ ] **Vigilant — manual-driven parser rebuild + add VS family** — the current `VigilantVm1Parser` was calibrated from CloudWatch logs only (no manual on hand at the time). Full doc set is now in tree at `tti-helper-mobile/facp_manual/Vigilant/`:
-    - **VM**: Kidde VM-1 Technical Reference (`3101890-EN-R006`), Operating Instructions, Users Guide, plus K85005-0068 / 0134 / 0138 Local Operator Console / Submittal / Life Safety Control System guides.
+    - **VM**: Kidde VM-1 Technical Reference (`3101890-EN-R006`, June 2018 — primary), Operating Instructions, Users Guide, K85005-0068 Local Operator Console, K85005-0134 Submittal Guide, K85005-0138 Life Safety Control System.
     - **VS**: Kidde Vigilant VS1+VS2 Installation/Operations/Programming 2010, plus the VS2-specific manual.
 
-    Plan mirrors the (16) Notifier manual-driven rewrite combined with the (26) Fire-Lite shared-parser pattern:
-    1. Read VM-1 manuals first; rewrite `vigilant_vm1_parser.dart` body banner-driven against manual-cited tables, with bench fixtures retained as regression tests.
-    2. Read VS1/VS2 manuals; decide whether VS shares the VM wire format (one shared `VigilantParser` taking a `FacpModel`, like `FireLiteParser` covers 9050+9600) or needs its own class.
-    3. Add new `FacpModel` values for the VS family (likely `vigilantVS1` / `vigilantVS2`) and run them through the picker brand-grouping.
-    4. Bench-verify on physical panels — VS family has zero calibration data so far; VM-1 has the (existing) CloudWatch-derived fixtures plus whatever the field-test pass surfaces.
+    **VM-1 audit findings (2026-05-03, against `3101890-EN-R006`):**
 
-    Cross-repo: `tti-helper-mobile` only. Slot recommendation: after (26) field-test closes out, alongside the parked Fire-Lite 9050 refactor — both are "manual-driven rebuild of a CloudWatch-calibrated parser" tasks of the same shape.
+    *Critical caveat* — the TR documents what the panel **logs/displays** (event queues, Details screen, History report) but does **not publish a byte-level printer/RS-232 wire-format spec**. MIR-PRT/S section (TR pp. 95-98) is hardware-only (DB-25, DIP, 4800-8N1). HyperTerminal section (pp. 164-165) shows no sample output. So the manual *will not* eliminate the need for a bench dump — it sharpens *where to look* and exposes one outright behavior bug.
+
+    What the manual *confirms*:
+    - Two-line emit pattern (banner + descriptor) — TR p. 17, Fig 6.
+    - 24-hour `HH:MM:SS MM/DD/YYYY` — TR Fig 6.
+    - Verbs `ALARM ACTIVE` and `COMMON TRBL ACT` printed verbatim — TR pp. 17, 39. (Manual does NOT enumerate the rest of the verb dictionary.)
+    - Restoration is per-point — TR p. 36.
+
+    What the manual *contradicts* (likely parser bugs):
+    - **🚨 Wipe-on-RESET is wrong.** TR p. 38: *"Pressing Reset restores the system to normal, provided all latched inputs have been restored."* Active alarms whose source is still asserted **survive Reset**. No documented `SYSTEM NORMAL` sweep, no per-event `CLEARED` cascade. Behavior is closer to Fire-Lite (RESET is effectively a no-op for the parser) than Notifier 3030. Today's `vigilant_vm1_parser.md:88` build-3 fall-through wipes everything — drop that for Vigilant in the rebuild.
+    - **PRE-ALARM is missing from the verb list.** TR Table 16 p. 27 lists primary/secondary states as Alarm / **Prealarm** / Trouble. Parser (`vigilant_vm1_parser.dart:120-140`) routes prealarm rows to `system` (no-op) today.
+    - **ACK is metadata, not a log line.** TR p. 37: ACK adds a check-mark + "Acknowledged" tag on the existing queue entry, not a separate event class. The CloudWatch-observed `ACTIVATE RESET` / `ACTIVATE ALM SILENCE` standalones are **operator-command echoes** (TR Tables 8-16, pp. 20-27), belong on the operator-command track only.
+    - **Address format is concatenated decimal `PPCCDDDD`** (8 digits) per TR Appendix B p. 190 — not hex. Parser regex accepts hex (`[0-9A-Fa-f]+`); narrow to digits-only in the rebuild. The `P:nn C:nn D:nnnn` form the parser sees is the LCD Details rendering (TR Fig 10 p. 39).
+
+    What the manual is *silent on* — bench data still required:
+    - Comprehensive banner verb dictionary (`TRBL ACT`, `TAMPER ACTIVE`, `MNTR ACT`, `PULL STATION ACT`, etc. all came from CloudWatch, not the manual).
+    - The `::` separator (panel/firmware quirk; not documented).
+    - `-OPERATOR COMMAND-` literal log-line format.
+    - Per-event latching attribute — TR p. 46 says latching is a **device-programming property**, not a banner-string attribute. We can't derive it from the verb the way Notifier 320/640 lets us; either accept the limitation or get a programming dump.
+
+    Dialect risks the manual flags:
+    - **Bilingual installs** (TR p. 26 Toggle Language) can emit primary message text in French/Spanish mixed with English — regex on English banner strings will silently drop events.
+    - C-CPU firmware 1.x scope only.
+
+    **VS1/VS2 audit findings (2026-05-03, against `3101113 Rev 4.0`, ISS 02MAR10, GE Security):**
+
+    *Note* — unlike the VM TR, the VS manual *does* publish an explicit printer wire-format spec with worked samples (Ch.3 "Event printout examples", pp.145-146). The `Kidde-VS2-Manual.pdf` is the same document rebranded — one read covers both panels. Far more authoritative than the VM source.
+
+    What the VS manual documents:
+    - **Two-line emit, pipe-separated:** `<VERB> | HH:MM:SS MM/DD/YYYY <ADDRESS>` line 1, descriptor line 2. The separator is a literal ` | ` (space-pipe-space) — *not* the `::` quirk seen on VM-1.
+    - **Closed verb dictionary** (Table 39, pp.144-145, two columns LCD-vs-Printer): `SMK ACT`, `HEAT ACT`, `DUCT ACT`, `PULL ACT`, `WFLW ACT`, `ALRM ACT`, `SUPV ACT`, `MON ACT`, `PALM ACT`, `ALMV ACT`, `MANT ACT`, `TRBL ACT`, `DSBL ACT`, `TEST ACT` — all `<4-LETTER MNEMONIC> ACT`. Latching variants of supervisory inputs print **identically** — latch attribute not encoded in the verb.
+    - **Four address prefix forms:** `L:N D:NNN` (loop+device, two separate fields), `Z:NNN` (zone), `A:NNN` (annunciator), `E:NNN` (internal/panel event keyed to the Event ID dictionary). Loops 1-2, devices 001-254.
+    - **Event ID dictionary** (Table 40, pp.146-150) — 102 entries mapping `E:NNN` to human-readable system/internal events: 020 startup, 022 Reset, 024 Panel silence, 025 Signal silence, 026 Drill, 027 Walk test, 029 Clear history, 034 Ground fault, 036 Battery low, 038/041 AC power, 042 Common alarm, 043 Common supv, 044 Common monitor, 056-057 Net recvr faults, 058-061 NAC1-4 trouble, 062 Printer trouble, 063-070 Annunciator 1-8 trouble, 071-102 Zone 1-32 (active/trbl/dsbl/palm/almv/mant/test).
+    - **24-hour `HH:MM:SS MM/DD/YYYY`**, 4-digit year — same as VM-1.
+    - **RESET semantics match VM** (p.151 verbatim parallel of VM TR p.38): active conditions survive Reset. Reset emits Event 022 only, no per-event CLEAR cascade. ACK emits Event 024/025 only — metadata-not-log-line, same as VM.
+    - **VS1 vs VS2 is hardware-only** (loop count, zone capacity); wire format byte-identical. One parser class covers both.
+    - **No bilingual / Toggle Language feature** — not present in this 2010 GE-Security manual (a later VM-era addition).
+    - **9600-8N async** RS-232 (vs VM-1's 4800).
+
+    What the VS manual is *silent on* — bench data still required:
+    - **Restore/clear verb form.** Manual nowhere shows a `*** RST` or `*** CLR` printer string. History report references "event-state restoration" (p.168) but the wire format for a restoration line is silent. **Bench dump required** for restore handling — likely the only blocker before VS parser coding.
+    - Per-event sequence/index numbers on the wire (LCD shows `001`-style queue position but printer samples don't include it).
+
+    **VM-vs-VS verdict — distinct dialects, separate parser classes:**
+
+    | Dimension | VM-1 | VS1/VS2 |
+    |---|---|---|
+    | Separator | `::` (panel quirk) | ` \| ` (pipe, manual-spec) |
+    | Verbs | `ALARM ACTIVE` / `COMMON TRBL ACT` (manual sparse; rest from CloudWatch) | 14 enumerated `<MNEM> ACT` mnemonics, Table 39 |
+    | Address | `PPCCDDDD` 8-digit decimal concatenated (LCD: `P:nn C:nn D:nnnn`) | 4 typed prefix forms: `L:N D:NNN`, `Z:NNN`, `A:NNN`, `E:NNN` |
+    | Event ID dictionary | None | 102-entry Table 40 |
+    | Event-number prefix | Yes (line 1 starts with event number per Fig 6) | No (LCD-only) |
+    | Baud | 4800 | 9600 |
+    | RESET semantics | Active conditions survive | **Same** — active conditions survive |
+    | ACK | Metadata, not log line | **Same** — Event 024/025 only |
+    | Restore line | Bench-only evidence | Manual silent — bench dump required |
+
+    Address tokenizer, verb dictionary, and separator diverge enough that a shared `VigilantParser` would be more conditional branches than shared code. Build a separate **`VigilantVsParser` class** covering VS1+VS2 jointly (mirrors the FireLite 9050+9600 pattern but with two parser CLASSES, not one shared class).
+
+    **Rebuild plan (revised after VM + VS audits):**
+    1. **Fix RESET semantics on VM-1** — switch from wipe-on-RESET fall-through to per-event `*_RST`-only clearing. Both manuals support this; no bench evidence needed to justify. **Could land as a standalone one-line fix in any (XX) build** without waiting for the full rebuild.
+    2. **Add `PREALM` / `PRE-ALARM` / `PREALARM`** to VM-1 verb list as `FacpEventType.alarm` with prealarm severity (match Notifier convention).
+    3. **Schedule a VM-1 bench-dump session** — capture full lifecycle (alarm/trouble/supervisory/monitor/prealarm/disable/test, RESET, SILENCE, ACK, operator commands). Save to `tti-helper-mobile/facp_manual/Vigilant/VM/bench_raw/`. Mirrors the (23) Notifier 3030 + (26) Fire-Lite 9600 dump pattern.
+    4. **Schedule a VS1 or VS2 bench-dump session** — primary goal is capturing the (manual-undocumented) restore-line format. Save to `tti-helper-mobile/facp_manual/Vigilant/VS/bench_raw/`.
+    5. **Add new `FacpModel` values** for VS family — `vigilantVS1` and `vigilantVS2` (one parser class covers both). Update brand-grouping picker.
+    6. **Build `VigilantVsParser` class** — banner-driven against Table 39 + Table 40 dictionaries. Address tokenizer for `L:`/`D:`/`Z:`/`A:`/`E:` forms. Pipe-separator regex. Restore-line handling driven by bench-dump evidence.
+    7. **Rewrite `vigilant_vm1_parser.dart` banner-driven** — bench-dump as primary evidence, manual as authority on RESET/PREALARM/address-format/operator-commands. Retain existing fixtures as regression tests.
+    8. **Bench-verify on physical panels.**
+
+    Cross-repo: `tti-helper-mobile` only. Slot recommendation: after (26) field-test closes out, alongside the parked Fire-Lite 9050 refactor — both are "manual-driven rebuild of a CloudWatch-calibrated parser" tasks of the same shape. Step 1 (RESET fix) is opportunistically extractable into any earlier build.
 
 ## 1. Address risks flagged in the mobile review
 
