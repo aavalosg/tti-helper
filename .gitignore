@@ -6,3 +6,9 @@ tti-helper-hw/
 tti-helper-legal/
 tti-helper-web/
 ttireader/
+
+# macOS Finder metadata
+.DS_Store
+
+# TestFlight / App Store Connect preflight artifacts
+*PreFlight.pdf
