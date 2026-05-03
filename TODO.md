@@ -195,9 +195,21 @@ If anything fails to save, you'll now see a "Save failed: <error>" message in a 
 
 Non-Notifier panels (Fire-Lite, Vigilant, EST iO) are unchanged from build (15) and do not need re-testing.
 
-## 0b. Backlog — not bound to (19)
+## 0b. Backlog — not bound to (26)
 
 - [ ] **Messages lost while app is suspended (iOS standby)** — when the iPhone enters standby or the app is backgrounded, iOS suspends the process and the MQTT WebSocket connection drops; any alarms published during that window never reach the app on resume. Critical for a life-safety product. Likely path: route alarms through **APNs push notifications** (AWS IoT Rule → SNS → APNs) so the OS wakes the app/shows the alert independently of the in-app MQTT session. In-app MQTT then resyncs on foreground. Decide whether to keep MQTT for live foreground use only, or also add a "missed events since X" replay (retained MQTT or a tiny REST endpoint backed by IoT analytics / DynamoDB). Cross-repo: `tti-helper-mobile` + `tti-helper-aws`.
+
+- [ ] **Vigilant — manual-driven parser rebuild + add VS family** — the current `VigilantVm1Parser` was calibrated from CloudWatch logs only (no manual on hand at the time). Full doc set is now in tree at `tti-helper-mobile/facp_manual/Vigilant/`:
+    - **VM**: Kidde VM-1 Technical Reference (`3101890-EN-R006`), Operating Instructions, Users Guide, plus K85005-0068 / 0134 / 0138 Local Operator Console / Submittal / Life Safety Control System guides.
+    - **VS**: Kidde Vigilant VS1+VS2 Installation/Operations/Programming 2010, plus the VS2-specific manual.
+
+    Plan mirrors the (16) Notifier manual-driven rewrite combined with the (26) Fire-Lite shared-parser pattern:
+    1. Read VM-1 manuals first; rewrite `vigilant_vm1_parser.dart` body banner-driven against manual-cited tables, with bench fixtures retained as regression tests.
+    2. Read VS1/VS2 manuals; decide whether VS shares the VM wire format (one shared `VigilantParser` taking a `FacpModel`, like `FireLiteParser` covers 9050+9600) or needs its own class.
+    3. Add new `FacpModel` values for the VS family (likely `vigilantVS1` / `vigilantVS2`) and run them through the picker brand-grouping.
+    4. Bench-verify on physical panels — VS family has zero calibration data so far; VM-1 has the (existing) CloudWatch-derived fixtures plus whatever the field-test pass surfaces.
+
+    Cross-repo: `tti-helper-mobile` only. Slot recommendation: after (26) field-test closes out, alongside the parked Fire-Lite 9050 refactor — both are "manual-driven rebuild of a CloudWatch-calibrated parser" tasks of the same shape.
 
 ## 1. Address risks flagged in the mobile review
 
