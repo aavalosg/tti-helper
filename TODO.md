@@ -28,29 +28,25 @@ Test posture: +27 Vigilant tests across `vigilant_vm1_parser_test.dart` and `cla
 
 **Phase 3 (walk-test metadata flag) deferred** per user clarification: Inspection is normally a real-mode test on VM-1 (tech triggers a device, real alarm fires, gets captured). Walk-test is the exception and only matters as a metadata field on the report — implement when customer feedback dictates UX.
 
-**"What to Test" notes for the (28) External submission:**
+**"What to Test" notes for the (28) External submission** (paste-ready, ~1,650 chars — fits under TestFlight's char limit):
 
-Build 1.0.0 (28) is the first build with full support for the Vigilant VM-1 panel (the printer-port wire format the panel emits over RS-232). Pre-(28), VM-1 was partially supported with a shipped parser calibrated from a single 2026-03-31 capture, but it had several behavior bugs surfaced by a full bench session 2026-05-05 — those are all fixed in this build.
+Build 1.0.0 (28) adds full Vigilant VM-1 panel support driven by a 2026-05-05 bench session. Pre-(28) the VM-1 parser had several behavior bugs; all fixed in this build.
 
-After installing (28), please test against a Vigilant VM-1 panel:
+On a Vigilant VM-1 panel:
 
-(1) **Device Management** — pick "Vigilant VM-1" from the FACP picker if not already configured. App bar should show "VM-1" in green.
+(1) Device Management → pick "Vigilant VM-1". App bar shows "VM-1" in green.
 
-(2) **Troubleshooting → Active list**. Trigger a tamper switch (supervisory), a waterflow flow switch (alarm), and a smoke detector or pull station (alarm). Each event should appear in the Active list with the device's custom label as the description (e.g. "GND FL STAIR 2 EXIT PULL STATION") and the panel address (P:01 C:03 D:NNNN) below in monospace. The count badge should reflect the number of real conditions. Each event should be ONE row, not two — the panel emits banner + descriptor as separate MQTT messages but the app pairs them into a single Active entry.
+(2) Active list — trigger a tamper, a waterflow, and a pull station. Each event = ONE row with the device's custom label (e.g. "GND FL STAIR 2 EXIT PULL STATION") and panel address (P:01 C:03 D:NNNN) below in monospace. Pre-(28) you'd see TWO rows per event.
 
-(3) **Press RESET on the panel while a fault is still asserted** (e.g. waterflow valve still open). The Active list should NOT clear — the asserted condition stays in the Active list because the Vigilant panel sends a "loop-normalize request" rather than an unconditional wipe. Only when you physically clear the device (close the valve, re-key the pull station) does the corresponding RST emit and the row leave Active. This matches the Vigilant VM-1 Technical Reference manual p.38 behavior exactly.
+(3) Press RESET while a fault is still asserted (e.g. waterflow valve open). Active list must NOT clear. Asserted conditions survive RESET; only physically clearing the source emits the RST and removes the row. Matches VM-1 TR p.38.
 
-(4) **Trigger a NAC fault** (open a notification appliance circuit, e.g. disconnect a horn/strobe wire). The Active list should show a TROUBLE OPEN ACT row with the circuit identifier ("PS/NAC_01_02_1" or "WATERFLOW BELL" if the circuit has a custom label). When you reconnect the wire, the row should clear via the RST. In (27) and earlier this RST mistakenly classified as a new trouble, leaving a phantom row.
+(4) Open a NAC circuit (disconnect a horn wire). Active shows TROUBLE OPEN ACT for "PS/NAC_01_02_1". Reconnect → RST clears the row. Pre-(28) the RST mistakenly stayed as a phantom trouble.
 
-(5) **Press ACK / SIGNAL SILENCE / SYSTEM RESET on the panel.** Each press should produce ONE row in History (e.g. "ACTIVATE RESET" / "ACTIVATE ALM SILENCE" / "ACTIVATE PNL SILENCE") instead of three. Pre-(28) every operator press generated three history rows (header + verb + target) plus occasional `#!!!!` printer-noise rows; all gone now.
+(5) Press ACK / SIGNAL SILENCE / RESET on the panel. Each press = ONE history row (e.g. "ACTIVATE RESET"). Pre-(28) each press produced 3 noisy history rows.
 
-(6) **History page**. Scroll through the captured events for this session. Each device event should be ONE row (not two). Each operator command should be ONE row (not three). LOCAL family events (panel-internal data-card mapping cycles, "Mapping In Progress DataCard1") may appear in History — they're informational, not actionable, and they don't count toward the Active badge.
+(6) Inspection — start a session, mark a zone Active, trigger devices. Each ACT event becomes a Testing Areas row with custom label + panel address. Restore-edge events do NOT create separate rows. Mark Pass/Fail/N/A; add per-row + area-level notes; print the PDF.
 
-(7) **Inspection** — open Inspection from the home screen, start a new session for the VM-1 panel, mark a zone Active. Trigger a tamper switch, a waterflow, a pull station, and a smoke detector. Each should appear as a row in the Testing Areas tab with the device's custom label as the description and the panel address in the location field. Restore-edge events (TAMPER RESTORED / WATERFLOW RST etc.) should NOT create separate Testing Areas rows — they only clear the troubleshooting Active list. Mark each row Pass / Fail / N/A / Pending. Add per-row notes and an area-level "General Observation" at the foot of the zone.
-
-(8) **Inspection PDF**. Print the report. Each Testing Areas row should render with the device's custom label as the DESCRIPTION column (e.g. "GND FL STAIR 2 EXIT PULL STATION  PULL STATION ACT  ::  …  P:01  C:03  D:0388"). N/A rows should not appear in per-zone tables. Zones with typed notes should show the General Observation block at the foot.
-
-Other panel families (EST iO, Notifier, Fire-Lite) are unchanged from (27) — their tests still pass and no code changes touch their parsers. Switch the picker to one of those models mid-session and confirm previously-working behavior continues.
+Other panel families (EST iO, Notifier, Fire-Lite) unchanged from (27). Switch picker mid-session to verify previously-working behavior.
 
 **(28) bench-verification deferred** to TestFlight install. The 2026-05-05 bench session already verified each verb class against the panel's wire output via the simulator with FACP=Unknown; this build wires those same verbs through the Troubleshooting + Inspection layers. Field-test pending physical-device install.
 
