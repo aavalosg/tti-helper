@@ -2,12 +2,29 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(27) — Inspection feature: iO walk-test + normal-mode capture, two-line pairing reuse, PDF observation/raw-line surfacing. Local-only; not built/uploaded yet.
+## 0. In flight — TestFlight 1.0.0(27) — Inspection feature: iO walk-test + normal-mode capture, two-line pairing reuse, PDF observation/raw-line surfacing. IPA built 2026-05-04, awaiting Transporter upload + field-test.
 
 **Local state as of 2026-05-04:**
-- `pubspec.yaml` is `1.0.0+27`. Mobile working tree has the (27) iO inspection rewrite uncommitted at the start of this session — work landed across two repos (mobile + parent TODO) in the 2026-05-04 evening session.
+- `pubspec.yaml` is `1.0.0+27`. Mobile HEAD `3bae3c9`, parent HEAD `6b16220` — both commits made 2026-05-04 evening session, ready to push.
+- (27) IPA built 2026-05-04 22:42:55 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Awaiting Transporter upload. Bench-verified on iO500 panel during the same session before build.
 - (26) field-tested OK 2026-05-04 (Fire-Lite 9600 alarm-mode lifecycle on physical panel; walk-test mode revealed gaps that triggered the (27) work).
 - 298/298 mobile tests pass. `flutter analyze` clean of new issues.
+
+**"What to Test" notes for the (27) External submission:**
+
+Build 1.0.0 (27) is a major upgrade to the Inspection feature for EST iO panels. Pre-(27), the Inspection feature only captured iO walk-test events (TEST ACT) into Testing Areas — normal-mode events like Pull Station alarms, smoke detector alarms, and supervisory activations silently dropped without ever reaching the inspection record.
+
+After installing (27), please:
+
+(1) Open Inspection from the home screen, start a new session for an iO panel, mark a zone Active. Trigger a Pull Station, a Smoke Detector, and a Supervisory device (e.g. a tamper switch or PIV) on the panel. Each event should appear as a row in the Testing Areas tab with the device's programmed custom label as the description (or "Loop X Device Y" / "NAC NN" if no custom label is set), the FACP zone in the location field, and the panel's authoritative header line (e.g. `PULL ACT | … L:1 D:187`) shown beneath in monospace.
+
+(2) Press SYSTEM RESET on the panel. The inspection rows should stay — only the troubleshooting Active list clears. You can then mark each row Pass / Fail / N/A / Pending, optionally adding a per-event observation in the row's NOTES field. At the end of the zone, type an area-level "Notes" / observation in the bottom textfield — that becomes the "General Observation" block at the foot of the zone in the printed report.
+
+(3) Switch the panel into Walk Test mode and trigger a couple of devices. Each TEST ACT event should be captured the same way as normal-mode events; TEST RST events from the panel should NOT create separate rows (the active map clears them silently). Walk Test entry/exit signals (TRBL ACT/RST E:047) are intentionally not captured — they're panel-internal mode changes, not device tests.
+
+(4) Print the inspection report. N/A entries should NOT appear in the per-zone tables. Each zone with a typed area-level note should show a labeled "General Observation" block at its foot, with a dark left accent and grey background. The DESCRIPTION column on each event row should read `<device label> <raw FACP header>` (e.g. `1St flgptwdkmtmpgmadPIV SUPV ACT | … L:1 D:126`).
+
+Other panel families: Fire-Lite walk-test parsing was also fixed in this build — if you have a Fire-Lite 9050 or 9600 available, please trigger devices in walk-test mode and confirm events land in Testing Areas with proper ADDRESS columns (no empty cells, no raw timestamps in the description). Notifier walk-test inspection is not yet addressed — that's deferred to (28). Troubleshooting (Live Events) on all families is unchanged from (26) except for one bucket-routing change: iO supervisory events (SUPV ACT) now appear under "Others" instead of "Trouble".
 
 **(27) iO scope shipped (this session, bench-verified on iO500):**
 
