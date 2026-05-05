@@ -2,55 +2,63 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(27) — Inspection feature: iO walk-test + normal-mode capture, two-line pairing reuse, PDF observation/raw-line surfacing. IPA built + uploaded 2026-05-04, awaiting field-test.
+## 0. In flight — TestFlight 1.0.0(28) — Vigilant VM-1: full Troubleshooting + Inspection + Reporting support, bench-driven from session 2026-05-05. IPA built 2026-05-05 13:27, awaiting Transporter upload.
 
-**Local state as of 2026-05-04:**
-- `pubspec.yaml` is `1.0.0+27`. Mobile HEAD `3bae3c9`, parent HEAD `b47fc89` — both pushed.
-- (27) IPA built 2026-05-04 22:42:55 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa` and uploaded to TestFlight via Transporter the same evening. Bench-verified on iO500 panel during the build session; awaiting physical-device field-test on iPhone via TestFlight install (scheduled 2026-05-05).
-- (26) field-tested OK 2026-05-04 (Fire-Lite 9600 alarm-mode lifecycle on physical panel; walk-test mode revealed gaps that triggered the (27) work).
-- 298/298 mobile tests pass. `flutter analyze` clean of new issues.
+**Local state as of 2026-05-05:**
+- `pubspec.yaml` is `1.0.0+28`. Mobile HEAD pending bump commit on top of `53e705b`. Parent HEAD pending TODO update.
+- 3 commits ahead of `origin/main` (RESET fix `b950f93` + bench artifacts `1339e69` + Phase 1+2 implementation `53e705b`); not pushed yet.
+- (28) IPA built 2026-05-05 13:27:08 (~40.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Awaiting upload via Transporter.
+- 325/325 mobile tests pass. `flutter analyze` clean on the four touched source files.
+- (27) field-tested OK 2026-05-04 (iO walk-test + normal-mode capture).
+- (26) field-tested OK 2026-05-04 (Fire-Lite 9600 alarm lifecycle).
 
-**"What to Test" notes for the (27) External submission:**
+**(28) scope shipped — Vigilant VM-1, full feature stack:**
 
-Build 1.0.0 (27) is a major upgrade to the Inspection feature for EST iO panels. Pre-(27), the Inspection feature only captured iO walk-test events (TEST ACT) into Testing Areas — normal-mode events like Pull Station alarms, smoke detector alarms, and supervisory activations silently dropped without ever reaching the inspection record.
+Driven by the 2026-05-05 bench session at customer site VM-1 (raw 947-line capture + annotated session log under `tti-helper-mobile/facp_manual/Vigilant/VM/bench_raw/`). 8 verb classes locked, 3 descriptor formats, refined RESET model, walk-test wire-indistinguishable, SYSTEM NORMAL not emitted on VM-1.
 
-After installing (27), please:
+1. **RESET-is-no-op fix** (`alarm_provider.dart`, commit `b950f93`). VM-1 added to the early-break alongside `firelite9050`. TR `3101890-EN-R006` p.38 + 5× bench-confirmed C1 samples: RESET is a "loop-normalize request"; devices whose source is still asserted survive RESET, only physically-cleared sources emit per-event RST/RESTORED on the next loop-poll cycle (~12-22 s). Pre-(28) wipe-on-RESET fall-through directly contradicted both manual and wire evidence — phantom Active list clears every time the tech pressed RESET while a fault was still asserted.
+2. **Verb classification fixes** (`vigilant_vm1_parser.dart` `_eventType`). Pre-(28) WATERFLOW ACTIVE/RST and MONITOR ACTIVE/RESTORED fell through to system bucket (so a real waterflow alarm wouldn't appear in the Alarms bucket); LOCAL MNTR/TRBL routed to supv/trouble via substring matches (so panel housekeeping cycles polluted Active list as if they were supervisory events); TROUBLE OPEN RST mis-classified as trouble because TROUBLE substring matched before RST branch. Reordered checks (LOCAL prefix first, restore-edge before ACT-edge) and added explicit WATERFLOW/MONITOR cases.
+3. **Three descriptor regex branches** (`vigilant_vm1_parser.dart` `_descriptionFrom`). Device-class events (D-prefix optional, widened from `\d{3,4}` to `\d+` to handle 2-digit prefixes seen in the bench), LOCAL system events (PPCCDDDD-concat with no whitespace separator), TROUBLE NAC structured ID (`PS/NAC_<P>_<C>_<n>` optionally followed by freeform label).
+4. **Banner→descriptor pairing** (`facp_model.dart` + `alarm_provider.dart` `_classify`). VM-1 added to `expectsPairs`; pre-(28) treated VM-1 as non-pairing, producing 2 history rows per device event (banner + descriptor as separate events). Now uses the existing event-first pairing buffer (~33 ms gap with sane seqnbr).
+5. **Operator-cmd 3-message group filter + `#!!!!` printer noise** (`alarm_provider.dart` `_isVigilantOpCmdNoise`). Drops the `-OPERATOR COMMAND-` header, the wildcard target (`P:FFFFFFFFFFFFFFFF C:00 D:0000`), the panel-self target (`P:00 C:00 D:0000`), and the `#!!!!` printer control character — all BEFORE pairing logic. The verb line (ACTIVATE X / CHANGE X) survives the filter and is logged once as a system event in History. Pre-(28) every operator press produced 3 noisy History rows.
+6. **Inspection backend** (`zone_event_provider.dart` `_isTestingAreaEvent`). Added Vigilant ACT-edge prefixes (`PULL STATION ACT`, `WATERFLOW ACTIVE`, `TAMPER ACTIVE`, `MONITOR ACTIVE` — `ALARM ACTIVE` rides the existing bare 'ALARM' prefix). Added `troubleRestore` early-skip in `_onEvent` so Vigilant `ALARM RESTORED` / `TAMPER RESTORED` don't pass the `startsWith` gates and create stray Testing Areas rows.
+7. **Reporting (PDF)**. Confirmed model-agnostic — renders Testing Areas rows verbatim. No code changes; VM-1 rows render with the same description column / raw-line surfacing / general-observation block as iO/Notifier/Fire-Lite.
 
-(1) Open Inspection from the home screen, start a new session for an iO panel, mark a zone Active. Trigger a Pull Station, a Smoke Detector, and a Supervisory device (e.g. a tamper switch or PIV) on the panel. Each event should appear as a row in the Testing Areas tab with the device's programmed custom label as the description (or "Loop X Device Y" / "NAC NN" if no custom label is set), the FACP zone in the location field, and the panel's authoritative header line (e.g. `PULL ACT | … L:1 D:187`) shown beneath in monospace.
+Test posture: +27 Vigilant tests across `vigilant_vm1_parser_test.dart` and `classify_line_test.dart` covering all 8 verb classes, 4 descriptor format variants, banner classifier routing, and noise-filter edge cases. 325/325 passing.
 
-(2) Press SYSTEM RESET on the panel. The inspection rows should stay — only the troubleshooting Active list clears. You can then mark each row Pass / Fail / N/A / Pending, optionally adding a per-event observation in the row's NOTES field. At the end of the zone, type an area-level "Notes" / observation in the bottom textfield — that becomes the "General Observation" block at the foot of the zone in the printed report.
+**Phase 3 (walk-test metadata flag) deferred** per user clarification: Inspection is normally a real-mode test on VM-1 (tech triggers a device, real alarm fires, gets captured). Walk-test is the exception and only matters as a metadata field on the report — implement when customer feedback dictates UX.
 
-(3) Switch the panel into Walk Test mode and trigger a couple of devices. Each TEST ACT event should be captured the same way as normal-mode events; TEST RST events from the panel should NOT create separate rows (the active map clears them silently). Walk Test entry/exit signals (TRBL ACT/RST E:047) are intentionally not captured — they're panel-internal mode changes, not device tests.
+**"What to Test" notes for the (28) External submission:**
 
-(4) Print the inspection report. N/A entries should NOT appear in the per-zone tables. Each zone with a typed area-level note should show a labeled "General Observation" block at its foot, with a dark left accent and grey background. The DESCRIPTION column on each event row should read `<device label> <raw FACP header>` (e.g. `1St flgptwdkmtmpgmadPIV SUPV ACT | … L:1 D:126`).
+Build 1.0.0 (28) is the first build with full support for the Vigilant VM-1 panel (the printer-port wire format the panel emits over RS-232). Pre-(28), VM-1 was partially supported with a shipped parser calibrated from a single 2026-03-31 capture, but it had several behavior bugs surfaced by a full bench session 2026-05-05 — those are all fixed in this build.
 
-Other panel families: Fire-Lite walk-test parsing was also fixed in this build — if you have a Fire-Lite 9050 or 9600 available, please trigger devices in walk-test mode and confirm events land in Testing Areas with proper ADDRESS columns (no empty cells, no raw timestamps in the description). Notifier walk-test inspection is not yet addressed — that's deferred to (28). Troubleshooting (Live Events) on all families is unchanged from (26) except for one bucket-routing change: iO supervisory events (SUPV ACT) now appear under "Others" instead of "Trouble".
+After installing (28), please test against a Vigilant VM-1 panel:
 
-**(27) iO scope shipped (this session, bench-verified on iO500):**
+(1) **Device Management** — pick "Vigilant VM-1" from the FACP picker if not already configured. App bar should show "VM-1" in green.
 
-1. **Inspection filter widened for iO 4-letter ACT verbs** (`zone_event_provider.dart:_isTestingAreaEvent`). Pre-(27) only Fire-Lite/Notifier verb forms (`ALARM`/`PRE-ALARM`/`ACTIVE`/`TEST`) matched the prefix gate, so iO normal-mode events (`PULL ACT`, `ALRM ACT`, `SUPV ACT`, etc.) silently dropped — Inspection only ever worked for iO inside walk-test mode where `TEST ACT` happened to match. Added 12 explicit iO `<MNEM> ACT` prefixes (Table 41 alarm-class + supervisory). RST suffix verbs intentionally excluded (the active-map clear via incidentKey still fires; just no separate Testing Areas row).
-2. **TEST narrowed to TEST ACT only** — drops the panel's `TEST RST` rows from Testing Areas. Per-event-row inspection record stays clean; the troubleshooting active map still pairs ACT/RST via incidentKey.
-3. **iO `SUPV` / `COSU` re-routed: `FacpEventType.trouble` → `FacpEventType.supervisory`** (`estio_parser.dart:_eventType`). Reverts the 2026-04-29 decision because type-aware downstream logic (inspection layer) now treats supervisory as a real device-condition class. Bucket on Live Events moves Trouble → Others. `_updateActiveMap` already handles supervisory identically to alarm/active so no clearing-behavior change. Existing parser tests updated: `SUPV ACT` and `COSU ACT` now expect `supervisory` + `EventBucket.others`.
-4. **Architectural fix: Inspection consumes the parsed-event stream from `alarm_provider`** instead of subscribing to raw MQTT. New `StreamController<FacpEvent>.broadcast()` on `AlarmNotifier`, emitted in `_emitEvent` after the seqnbr-keyed line1+line2 pairing buffer matches. `ZoneEventNotifier.build()` reads `alarmProvider.notifier.parsedEvents` (using `ref.read` not `ref.watch` so state changes don't tear down the subscription). Effect: descriptor (custom device label) is correct in inspection rows because the parser now sees both lines. Eliminates the parallel-consumer flaw the inspection feature was originally bolted on with.
-5. **Fire-Lite asterisk-time fix** (`firelite_parser.dart:_re`) — regex separator `\d{2}:\d{2}[AP]` → `\d{2}[:*]\d{2}[AP]`. Walk-test events on the 9600 (where the panel substitutes `*` for `:` as a printer-port walk-test marker) now parse on the same path as alarm-mode and route to alarm/supervisory buckets normally instead of falling through to the system-event branch with empty zone. 5 new test fixtures including a regression guard for the `:` time form. Bench-dump for Fire-Lite walk-test still pending (the regex fix is grounded in Image 1/2 PDF screenshot evidence, not on a captured wire dump).
-6. **`ZoneEventEntry.rawLine1` field** + **DB migration v3 → v4** (`inspection_database.dart`): new `raw_line1 TEXT` column on `zone_event_entries`, populated from `event.rawLine1` in `_onEvent`. Surfaced on the Testing Areas card (in monospace below time/zone) so the inspector sees the same authoritative header line that Live Events shows.
-7. **Inspection PDF**:
-    - **N/A entries dropped from per-zone tables** (per-row N/A no longer prints to AHJ). Zone-level filter intentionally NOT applied — zones with N/A result still render so their area-level note ("General Observation") prints. Summary line: "Pass: X  Fail: Y  Pending: Z" (N/A counter removed).
-    - **"General Observation" block** at the foot of every zone — labeled, bordered, dark left accent, 9pt body. Replaces the old 8pt grey one-liner that was easy to miss. Always renders if `zone.notes` is non-empty, regardless of zone result.
-    - **DESCRIPTION column shows `description + ' ' + rawLine1`** — parsed device label first (e.g. `1St flgptwdkmtmpgmadPIV`), then a single space, then the panel's authoritative header line (e.g. `SUPV ACT | … L:1 D:126`). Falls back to just `description` for legacy rows without `rawLine1`.
+(2) **Troubleshooting → Active list**. Trigger a tamper switch (supervisory), a waterflow flow switch (alarm), and a smoke detector or pull station (alarm). Each event should appear in the Active list with the device's custom label as the description (e.g. "GND FL STAIR 2 EXIT PULL STATION") and the panel address (P:01 C:03 D:NNNN) below in monospace. The count badge should reflect the number of real conditions. Each event should be ONE row, not two — the panel emits banner + descriptor as separate MQTT messages but the app pairs them into a single Active entry.
 
-**(27) iO bench-verification on iO500 panel 2026-05-04 (in this session):**
-- iO normal mode: PULL ACT / ALRM ACT / SUPV ACT all captured to Testing Areas with custom device labels and proper bucket routing.
-- iO walk-test mode: TEST ACT for L:1 D:126 (PIV), L:1 D:187 (smoke), E:130 / E:131 (NAC 03/04) all captured. TRBL ACT/RST E:047 walk-test entry/exit signals correctly skipped (panel-internal, not device tests).
-- TEST RST drops from inspection layer; troubleshooting Active list still clears the corresponding TEST ACT entry.
-- General Observation block + DESCRIPTION column rendering verified on PDF print.
+(3) **Press RESET on the panel while a fault is still asserted** (e.g. waterflow valve still open). The Active list should NOT clear — the asserted condition stays in the Active list because the Vigilant panel sends a "loop-normalize request" rather than an unconditional wipe. Only when you physically clear the device (close the valve, re-key the pull station) does the corresponding RST emit and the row leave Active. This matches the Vigilant VM-1 Technical Reference manual p.38 behavior exactly.
 
-**(27) still pending before build/upload:**
-1. **Fire-Lite walk-test bench dump** — disconnect iO, connect 9600, capture a walk-test session into `facp_manual/Firelite/bench_9600_raw/raw_<date>_walktest.txt` to verify the asterisk-time hypothesis against real wire bytes (currently grounded in PDF-screenshot evidence only). Apply the analogous filter widening if needed (Fire-Lite walk-test should already capture via existing `ALARM:` / `ACTIVE` / `PRE-ALARM` prefixes since the verbs don't change in walk-test mode).
-2. **Notifier walk-test bench dump** — same exercise on a Notifier panel. Wire form completely unverified for walk-test; might need a similar filter widening or a different mechanism entirely.
-3. **Description column refactor (parked, post-(27))** — see § 0b. The current `description + ' ' + rawLine1` mash works but isn't the long-term shape; needs a structured cell with proper hierarchy.
+(4) **Trigger a NAC fault** (open a notification appliance circuit, e.g. disconnect a horn/strobe wire). The Active list should show a TROUBLE OPEN ACT row with the circuit identifier ("PS/NAC_01_02_1" or "WATERFLOW BELL" if the circuit has a custom label). When you reconnect the wire, the row should clear via the RST. In (27) and earlier this RST mistakenly classified as a new trouble, leaving a phantom row.
 
-**(26) "What to Test" notes** — kept as historical reference below.
+(5) **Press ACK / SIGNAL SILENCE / SYSTEM RESET on the panel.** Each press should produce ONE row in History (e.g. "ACTIVATE RESET" / "ACTIVATE ALM SILENCE" / "ACTIVATE PNL SILENCE") instead of three. Pre-(28) every operator press generated three history rows (header + verb + target) plus occasional `#!!!!` printer-noise rows; all gone now.
+
+(6) **History page**. Scroll through the captured events for this session. Each device event should be ONE row (not two). Each operator command should be ONE row (not three). LOCAL family events (panel-internal data-card mapping cycles, "Mapping In Progress DataCard1") may appear in History — they're informational, not actionable, and they don't count toward the Active badge.
+
+(7) **Inspection** — open Inspection from the home screen, start a new session for the VM-1 panel, mark a zone Active. Trigger a tamper switch, a waterflow, a pull station, and a smoke detector. Each should appear as a row in the Testing Areas tab with the device's custom label as the description and the panel address in the location field. Restore-edge events (TAMPER RESTORED / WATERFLOW RST etc.) should NOT create separate Testing Areas rows — they only clear the troubleshooting Active list. Mark each row Pass / Fail / N/A / Pending. Add per-row notes and an area-level "General Observation" at the foot of the zone.
+
+(8) **Inspection PDF**. Print the report. Each Testing Areas row should render with the device's custom label as the DESCRIPTION column (e.g. "GND FL STAIR 2 EXIT PULL STATION  PULL STATION ACT  ::  …  P:01  C:03  D:0388"). N/A rows should not appear in per-zone tables. Zones with typed notes should show the General Observation block at the foot.
+
+Other panel families (EST iO, Notifier, Fire-Lite) are unchanged from (27) — their tests still pass and no code changes touch their parsers. Switch the picker to one of those models mid-session and confirm previously-working behavior continues.
+
+**(28) bench-verification deferred** to TestFlight install. The 2026-05-05 bench session already verified each verb class against the panel's wire output via the simulator with FACP=Unknown; this build wires those same verbs through the Troubleshooting + Inspection layers. Field-test pending physical-device install.
+
+**(27) "What to Test" notes** — kept as historical reference below.
+
+## 0z(27). (27) closeout (historical) — Inspection feature: iO walk-test + normal-mode capture, FIELD-TESTED OK 2026-05-04
+
+(27) shipped + field-tested 2026-05-04. Major upgrade to the Inspection feature for EST iO panels — pre-(27) Inspection only captured iO walk-test events (TEST ACT) into Testing Areas; normal-mode events like Pull Station alarms, smoke detector alarms, and supervisory activations silently dropped. (27) added 12 explicit iO ACT prefixes (Table 41 alarm-class + supervisory), narrowed TEST to TEST ACT only, re-routed iO SUPV/COSU from trouble to supervisory, fixed the parallel-consumer flaw via the new `parsedEvents` stream from `alarm_provider`, fixed Fire-Lite walk-test asterisk-time format, added `rawLine1` to ZoneEventEntry with DB migration v3→v4, dropped N/A entries from PDF per-zone tables, added "General Observation" block, and added the DESCRIPTION column with `description + ' ' + rawLine1` rendering. 298/298 tests pass. iO500 bench-verified. Field-test passed.
 
 ## 0z(26). (26) closeout (historical) — Fire-Lite MS-9600LS family + shared FireLiteParser, FIELD-TESTED OK 2026-05-04
 
