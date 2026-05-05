@@ -2,7 +2,54 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(28) — Vigilant VM-1: full Troubleshooting + Inspection + Reporting support, bench-driven from session 2026-05-05. IPA built 2026-05-05 13:27, awaiting Transporter upload.
+## 0. In flight — TestFlight 1.0.0(29) — Edwards EST3 panel support (shares wire dialect with Vigilant VM-1), bench-driven from a second 2026-05-05 session. IPA built 2026-05-05 18:11, awaiting Transporter upload.
+
+**Local state as of 2026-05-05:**
+- `pubspec.yaml` is `1.0.0+29`. Mobile HEAD pending bump commit. Parent HEAD pending TODO update.
+- (28) IPA built 2026-05-05 13:27 — **NOT uploaded** to TestFlight; superseded by (29). Only (29) needs upload.
+- (29) IPA built 2026-05-05 18:11:21 (~40.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Awaiting Transporter upload.
+- 346/346 mobile tests pass (+21 EST3 fixtures over (28)'s 325).
+- (27) field-tested OK 2026-05-04 (iO walk-test + normal-mode capture).
+
+**(29) scope shipped — Edwards EST3 panel routed through the existing Vigilant parser:**
+
+A second bench session 2026-05-05 ~15:16-16:55 EDT physically moved the TTI ESP32 from a Vigilant VM-1 panel to an Edwards EST3 panel. Wire-format finding: **EST3 emits the same `::`-separated dialect as VM-1** (both UTC family — Kidde Vigilant + Edwards Systems Technology share firmware lineage). The (28) `VigilantVM1Parser` handles EST3 events without code changes. (29) implementation is purely additive — no parser refactor, no UI behavior changes for existing panels.
+
+1. **`est3` enum value added to `FacpModel`** (lib/core/facp/facp_model.dart). Brand grouping renamed from "Edwards EST iO" to "Edwards EST" — three Edwards products (iO500, iO1000, EST3) now under one brand row in the picker. Newest-first picker order: iO500 → iO1000 → EST3.
+2. **Parser model parameter** added to `VigilantVM1Parser` constructor. Same parser class handles both `vigilantVM1` and `est3` — distinguished only by the propagated `model` field on parsed events. Mirrors the FireLite / Notifier / EstIO shared-parser pattern.
+3. **`GND FAULT ACTIVE/RST` verb classification added** to `_eventType()`. Bench-confirmed: EST3 dedicates a verb form for ground faults (mapped to `FacpEventType.trouble`), distinct from VM-1's `COMMON TRBL` reuse for the same condition.
+4. **Operator-cmd noise filter + wipe-on-RESET early-break extended to `est3`** in `alarm_provider.dart`. Both panels share the operator-cmd 3-group structure (`-OPERATOR COMMAND-` header / `ACTIVATE X` verb / wildcard target) and the loop-normalize RESET semantics.
+5. **EST3 fixtures** added in new `test/facp/est3_parser_test.dart` (21 tests): cross-panel events from P:00–P:06, `Network Panel NN Communication Fault` (no PPCCDDDD prefix), `Ext Database Incompatibility` (no prefix), `ReconstructngLine` (no-space typo variant), `Battery Trouble` (multi-space format), parenthesized `(B02)` annotation in tamper descriptor, `bypass on for testing` lowercase descriptor, GND FAULT class, three operator-cmd verbs.
+
+EST3-vs-VM-1 dialect differences logged: descriptor whitespace varies (EST3 emits multi-space column-aligned padding; VM-1 single-space), some LOCAL TRBL descriptors lack the PPCCDDDD-concat prefix (Network Panel comm faults, Ext Database Incompatibility), EST3 has dedicated `GND FAULT` verb, and EST3 uses `P:00 C:00` for panel-CPU pseudo-points where VM-1 uses `P:01`. (28) parser handles all of these via existing logic / new defensive cases.
+
+Bench artifacts at `tti-helper-mobile/facp_manual/EST/EST3/bench_raw/` — `raw_20260505_151605.txt` (740 lines) + `session_20260505_est3.md` (annotated log + manual-audit conclusions from `EST-EST3-v3.0-System-Operations-Manual.pdf` Rev 3.0 21OCT99).
+
+**"What to Test" notes for the (29) External submission** (paste-ready, ~1,500 chars):
+
+Build 1.0.0 (29) adds support for the Edwards EST3 panel (1996+ generation, distinct from the iO64/iO500/iO1000 family). Bench-confirmed 2026-05-05 that EST3 shares its printer-port wire format with the Vigilant VM-1, so (28)'s VM-1 parser handles EST3 events without rebuilds — (29) just adds the picker entry and routes correctly.
+
+On an Edwards EST3 panel:
+
+(1) Device Management → pick "Edwards EST3" from the FACP picker (under brand "Edwards EST"). App bar shows "EST3" in green.
+
+(2) Active list — trigger a smoke detector, pull station, tamper switch, and a NAC fault. Each event = ONE row with the device's custom label and panel address. Verify multi-space descriptors (e.g. "PULLSTATION FERNERY  PARKING NEXT TO C-81") render verbatim — whitespace preserved.
+
+(3) Cross-panel events — if the EST3 is on a multi-node network, trigger a condition on a sibling panel. Should appear in Active with the originating cabinet ID (P:02, P:04, etc.) in the address. Same handling as a local event.
+
+(4) Press RESET while a fault is asserted. Active list does NOT clear — same behavior as VM-1 (TR-confirmed loop-normalize semantics).
+
+(5) Trigger a ground fault. Should bucket as Trouble (new verb class added in (29) — `GND FAULT ACTIVE/RST`).
+
+(6) Press ACK / SIGNAL SILENCE / RESET on the panel. Each press = ONE history row, not three (same noise-filter behavior as VM-1).
+
+(7) Inspection — start a session, trigger devices, mark Pass/Fail/N/A. Print PDF.
+
+Other panel families (Vigilant VM-1, EST iO, Notifier, Fire-Lite) unchanged from (28). 
+
+**(28) "What to Test" notes** — kept as historical reference below.
+
+## 0z(28). (28) closeout (historical) — Vigilant VM-1: full Troubleshooting + Inspection + Reporting
 
 **Local state as of 2026-05-05:**
 - `pubspec.yaml` is `1.0.0+28`. Mobile HEAD pending bump commit on top of `53e705b`. Parent HEAD pending TODO update.
