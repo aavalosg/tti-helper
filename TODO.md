@@ -2,13 +2,48 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(26) — Fire-Lite MS-9600LS family + shared FireLiteParser, IPA built + uploaded 2026-05-02, awaiting field-test on physical 9600 panel
+## 0. In flight — TestFlight 1.0.0(27) — Inspection feature: iO walk-test + normal-mode capture, two-line pairing reuse, PDF observation/raw-line surfacing. Local-only; not built/uploaded yet.
 
-**Local state as of 2026-05-02:**
-- `pubspec.yaml` is `1.0.0+26`. HEAD `2f2d1a3` (mobile) — pushed. (26) IPA built 2026-05-02 21:15 (~43.6 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa` and uploaded to TestFlight via Transporter the same evening. The simulator-only "connection unit test" passed; full lifecycle bench-verify deferred to the physical-FACP test on a real MS-9600LS panel via TestFlight install.
-- (25) uploaded 2026-05-02 18:03 — AppBar refresh fix. Awaiting field-test.
+**Local state as of 2026-05-04:**
+- `pubspec.yaml` is `1.0.0+27`. Mobile working tree has the (27) iO inspection rewrite uncommitted at the start of this session — work landed across two repos (mobile + parent TODO) in the 2026-05-04 evening session.
+- (26) field-tested OK 2026-05-04 (Fire-Lite 9600 alarm-mode lifecycle on physical panel; walk-test mode revealed gaps that triggered the (27) work).
+- 298/298 mobile tests pass. `flutter analyze` clean of new issues.
+
+**(27) iO scope shipped (this session, bench-verified on iO500):**
+
+1. **Inspection filter widened for iO 4-letter ACT verbs** (`zone_event_provider.dart:_isTestingAreaEvent`). Pre-(27) only Fire-Lite/Notifier verb forms (`ALARM`/`PRE-ALARM`/`ACTIVE`/`TEST`) matched the prefix gate, so iO normal-mode events (`PULL ACT`, `ALRM ACT`, `SUPV ACT`, etc.) silently dropped — Inspection only ever worked for iO inside walk-test mode where `TEST ACT` happened to match. Added 12 explicit iO `<MNEM> ACT` prefixes (Table 41 alarm-class + supervisory). RST suffix verbs intentionally excluded (the active-map clear via incidentKey still fires; just no separate Testing Areas row).
+2. **TEST narrowed to TEST ACT only** — drops the panel's `TEST RST` rows from Testing Areas. Per-event-row inspection record stays clean; the troubleshooting active map still pairs ACT/RST via incidentKey.
+3. **iO `SUPV` / `COSU` re-routed: `FacpEventType.trouble` → `FacpEventType.supervisory`** (`estio_parser.dart:_eventType`). Reverts the 2026-04-29 decision because type-aware downstream logic (inspection layer) now treats supervisory as a real device-condition class. Bucket on Live Events moves Trouble → Others. `_updateActiveMap` already handles supervisory identically to alarm/active so no clearing-behavior change. Existing parser tests updated: `SUPV ACT` and `COSU ACT` now expect `supervisory` + `EventBucket.others`.
+4. **Architectural fix: Inspection consumes the parsed-event stream from `alarm_provider`** instead of subscribing to raw MQTT. New `StreamController<FacpEvent>.broadcast()` on `AlarmNotifier`, emitted in `_emitEvent` after the seqnbr-keyed line1+line2 pairing buffer matches. `ZoneEventNotifier.build()` reads `alarmProvider.notifier.parsedEvents` (using `ref.read` not `ref.watch` so state changes don't tear down the subscription). Effect: descriptor (custom device label) is correct in inspection rows because the parser now sees both lines. Eliminates the parallel-consumer flaw the inspection feature was originally bolted on with.
+5. **Fire-Lite asterisk-time fix** (`firelite_parser.dart:_re`) — regex separator `\d{2}:\d{2}[AP]` → `\d{2}[:*]\d{2}[AP]`. Walk-test events on the 9600 (where the panel substitutes `*` for `:` as a printer-port walk-test marker) now parse on the same path as alarm-mode and route to alarm/supervisory buckets normally instead of falling through to the system-event branch with empty zone. 5 new test fixtures including a regression guard for the `:` time form. Bench-dump for Fire-Lite walk-test still pending (the regex fix is grounded in Image 1/2 PDF screenshot evidence, not on a captured wire dump).
+6. **`ZoneEventEntry.rawLine1` field** + **DB migration v3 → v4** (`inspection_database.dart`): new `raw_line1 TEXT` column on `zone_event_entries`, populated from `event.rawLine1` in `_onEvent`. Surfaced on the Testing Areas card (in monospace below time/zone) so the inspector sees the same authoritative header line that Live Events shows.
+7. **Inspection PDF**:
+    - **N/A entries dropped from per-zone tables** (per-row N/A no longer prints to AHJ). Zone-level filter intentionally NOT applied — zones with N/A result still render so their area-level note ("General Observation") prints. Summary line: "Pass: X  Fail: Y  Pending: Z" (N/A counter removed).
+    - **"General Observation" block** at the foot of every zone — labeled, bordered, dark left accent, 9pt body. Replaces the old 8pt grey one-liner that was easy to miss. Always renders if `zone.notes` is non-empty, regardless of zone result.
+    - **DESCRIPTION column shows `description + ' ' + rawLine1`** — parsed device label first (e.g. `1St flgptwdkmtmpgmadPIV`), then a single space, then the panel's authoritative header line (e.g. `SUPV ACT | … L:1 D:126`). Falls back to just `description` for legacy rows without `rawLine1`.
+
+**(27) iO bench-verification on iO500 panel 2026-05-04 (in this session):**
+- iO normal mode: PULL ACT / ALRM ACT / SUPV ACT all captured to Testing Areas with custom device labels and proper bucket routing.
+- iO walk-test mode: TEST ACT for L:1 D:126 (PIV), L:1 D:187 (smoke), E:130 / E:131 (NAC 03/04) all captured. TRBL ACT/RST E:047 walk-test entry/exit signals correctly skipped (panel-internal, not device tests).
+- TEST RST drops from inspection layer; troubleshooting Active list still clears the corresponding TEST ACT entry.
+- General Observation block + DESCRIPTION column rendering verified on PDF print.
+
+**(27) still pending before build/upload:**
+1. **Fire-Lite walk-test bench dump** — disconnect iO, connect 9600, capture a walk-test session into `facp_manual/Firelite/bench_9600_raw/raw_<date>_walktest.txt` to verify the asterisk-time hypothesis against real wire bytes (currently grounded in PDF-screenshot evidence only). Apply the analogous filter widening if needed (Fire-Lite walk-test should already capture via existing `ALARM:` / `ACTIVE` / `PRE-ALARM` prefixes since the verbs don't change in walk-test mode).
+2. **Notifier walk-test bench dump** — same exercise on a Notifier panel. Wire form completely unverified for walk-test; might need a similar filter widening or a different mechanism entirely.
+3. **Description column refactor (parked, post-(27))** — see § 0b. The current `description + ' ' + rawLine1` mash works but isn't the long-term shape; needs a structured cell with proper hierarchy.
+
+**(26) "What to Test" notes** — kept as historical reference below.
+
+## 0z(26). (26) closeout (historical) — Fire-Lite MS-9600LS family + shared FireLiteParser, FIELD-TESTED OK 2026-05-04
+
+(26) shipped + field-tested 2026-05-04 in alarm mode on a physical MS-9600LS panel. Full TROUBL/CLEARt/ACTIVE/CLEARe/ALARM:/CLEARa lifecycle worked; OFF NORMAL summary placeholder filtering works as designed. Walk-test mode revealed two follow-up gaps — (i) Fire-Lite asterisk-time format `HH*MMA/P` failing the parser regex, (ii) inspection layer's prefix filter not recognizing iO 4-letter mnemonics — both addressed in (27). Bench-evidence: 31 events captured 2026-05-02 on real MS-9600LS panel — saved to `facp_manual/Firelite/bench_9600_raw/raw_20260502_195435_build25.txt`. 9050 + 9600 share an identical single-line printer/RS-232 wire format — confirmed against MS-9600LS Series Manual P/N 52646:B8 §4.4-4.6 + Table 3.1 (page 79). 50 fixtures total in `firelite_parser_test.dart`, 293/293 mobile tests passed pre-(27). Implementation details + commit list preserved at the prior (26) section now retained below for historical reference.
+
+**(26) historical local state (frozen 2026-05-02):**
+- `pubspec.yaml` was `1.0.0+26`. HEAD `2f2d1a3` (mobile) — pushed. (26) IPA built 2026-05-02 21:15 (~43.6 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa` and uploaded to TestFlight via Transporter the same evening. The simulator-only "connection unit test" passed; full lifecycle bench-verify deferred to the physical-FACP test on a real MS-9600LS panel via TestFlight install. **2026-05-04: bench-verify done — passed.**
+- (25) uploaded 2026-05-02 18:03 — AppBar refresh fix.
 - (24) uploaded 2026-05-02 17:40 then **ABANDONED** (AppBar-stale bug + Apple version-collision blocking re-upload at v24).
-- (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser. **Field-tested OK 2026-05-02** by user; ready to release.
+- (23) uploaded 2026-05-02 16:16 — Notifier 3030 parser. Field-tested OK 2026-05-02; ready to release.
 
 **(26) implementation — Fire-Lite MS-9600LS family parser + shared `FireLiteParser`:**
 - One new `FacpModel` enum value: `firelite9600` (covers MS-9600LS / LSE / UDLS / UDLSE / LSC — all SKUs share the same wire format per the manual). Picker grows from 10 → 11 entries; newest-first order puts 9600 above 9050.
@@ -195,7 +230,9 @@ If anything fails to save, you'll now see a "Save failed: <error>" message in a 
 
 Non-Notifier panels (Fire-Lite, Vigilant, EST iO) are unchanged from build (15) and do not need re-testing.
 
-## 0b. Backlog — not bound to (26)
+## 0b. Backlog — not bound to (27)
+
+- [ ] **Inspection PDF: refactor the DESCRIPTION column** — the (27) implementation glues `description` + `' '` + `rawLine1` into a single string for the column cell. Works as a quick-fix for AHJ-readable raw context, but the long-term shape should be a structured two-line cell (parsed description as the primary line, raw FACP header as a secondary line in monospace grey 6pt) so the visual hierarchy mirrors the Live Events / Testing Areas card layout. Currently both lines share the same 7pt style and look like one mashed string. Slot: any post-(27) build. Cross-repo: `tti-helper-mobile` only.
 
 - [ ] **Messages lost while app is suspended (iOS standby)** — when the iPhone enters standby or the app is backgrounded, iOS suspends the process and the MQTT WebSocket connection drops; any alarms published during that window never reach the app on resume. Critical for a life-safety product. Likely path: route alarms through **APNs push notifications** (AWS IoT Rule → SNS → APNs) so the OS wakes the app/shows the alert independently of the in-app MQTT session. In-app MQTT then resyncs on foreground. Decide whether to keep MQTT for live foreground use only, or also add a "missed events since X" replay (retained MQTT or a tiny REST endpoint backed by IoT analytics / DynamoDB). Cross-repo: `tti-helper-mobile` + `tti-helper-aws`.
 
