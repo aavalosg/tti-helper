@@ -2,11 +2,11 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(27) — Inspection feature: iO walk-test + normal-mode capture, two-line pairing reuse, PDF observation/raw-line surfacing. IPA built 2026-05-04, awaiting Transporter upload + field-test.
+## 0. In flight — TestFlight 1.0.0(27) — Inspection feature: iO walk-test + normal-mode capture, two-line pairing reuse, PDF observation/raw-line surfacing. IPA built + uploaded 2026-05-04, awaiting field-test.
 
 **Local state as of 2026-05-04:**
-- `pubspec.yaml` is `1.0.0+27`. Mobile HEAD `3bae3c9`, parent HEAD `6b16220` — both commits made 2026-05-04 evening session, ready to push.
-- (27) IPA built 2026-05-04 22:42:55 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Awaiting Transporter upload. Bench-verified on iO500 panel during the same session before build.
+- `pubspec.yaml` is `1.0.0+27`. Mobile HEAD `3bae3c9`, parent HEAD `b47fc89` — both pushed.
+- (27) IPA built 2026-05-04 22:42:55 (~42.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa` and uploaded to TestFlight via Transporter the same evening. Bench-verified on iO500 panel during the build session; awaiting physical-device field-test on iPhone via TestFlight install (scheduled 2026-05-05).
 - (26) field-tested OK 2026-05-04 (Fire-Lite 9600 alarm-mode lifecycle on physical panel; walk-test mode revealed gaps that triggered the (27) work).
 - 298/298 mobile tests pass. `flutter analyze` clean of new issues.
 
