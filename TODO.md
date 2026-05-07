@@ -2,14 +2,41 @@
 
 > **See `ROADMAP.md`** for the full Phase 1–4 plan (troubleshooting, inspection, portal admin, record of completion). This file is the immediate next-steps; ROADMAP is the durable phase plan.
 
-## 0. In flight — TestFlight 1.0.0(29) — Edwards EST3 panel support (shares wire dialect with Vigilant VM-1), bench-driven from a second 2026-05-05 session. IPA built 2026-05-05 18:11, awaiting Transporter upload.
+## 0. In flight — TestFlight 1.0.0(30) — PDF report debrand (cosmetic; trademark not yet registered). IPA built 2026-05-06 20:35, awaiting Transporter upload.
 
-**Local state as of 2026-05-05:**
-- `pubspec.yaml` is `1.0.0+29`. Mobile HEAD pending bump commit. Parent HEAD pending TODO update.
-- (28) IPA built 2026-05-05 13:27 — **NOT uploaded** to TestFlight; superseded by (29). Only (29) needs upload.
-- (29) IPA built 2026-05-05 18:11:21 (~40.5 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Awaiting Transporter upload.
-- 346/346 mobile tests pass (+21 EST3 fixtures over (28)'s 325).
-- (27) field-tested OK 2026-05-04 (iO walk-test + normal-mode capture).
+**Local state as of 2026-05-06:**
+- `pubspec.yaml` is `1.0.0+30`. Mobile HEAD `d85acfe`, pushed.
+- (29) IPA uploaded to TestFlight 2026-05-05 and field-tested OK 2026-05-06.
+- (30) IPA built 2026-05-06 20:35:?? (~41 MB) at `tti-helper-mobile/build/ios/ipa/TTI Helper.ipa`. Awaiting Transporter upload.
+- No new tests required — PDF generators are not test-covered and the change is purely cosmetic. `flutter analyze` clean on the two touched files.
+
+**(30) scope shipped — strip "TTI HELPER" wordmark from PDF report headers:**
+
+The customer-facing report headers in both PDF generators previously rendered a red "TTI HELPER" wordmark on the left and a light-gray subtitle on the right, separated by a 1.5pt red brand divider. Both generators now render only the report title (dark gray, 14pt bold) above a 1.0pt grey400 divider. The "TTI Helper" trademark is not yet registered, so reports delivered to clients/AHJ in the interim must not assert the unregistered mark.
+
+1. **`lib/features/inspection/pdf/inspection_pdf_generator.dart`** — `_header()` simplified; "Fire Inspection Report" is now the sole header element. Unused `_brand` constant removed.
+2. **`lib/core/pdf/session_pdf_generator.dart`** — `_header()` simplified; "Troubleshooting Session Report" is now the sole header element. Unused `_brand` constant removed.
+
+Not changed (still TTI-named): in-app UI text (Welcome AppBar, login screen, biometric prompt, app title) and the shared inspection PDF filename `TTI_Inspection_<Client>_<Date>.pdf`. When the trademark registration completes, restore the original header form (red wordmark + brand divider) — see auto-memory `project_pdf_debrand_pending_registration.md` for the previous code block to revert.
+
+**"What to Test" notes for the (30) External submission** (paste-ready, ~700 chars):
+
+Build 1.0.0 (30) is a cosmetic-only update to the PDF report headers. No panel-parsing, MQTT, or feature behavior changes from (29).
+
+(1) Generate any Troubleshooting Session report (Welcome → resume any prior session → finalize → Print PDF). Header on every page should read "Troubleshooting Session Report" in dark gray with a thin gray divider. No red "TTI HELPER" wordmark.
+
+(2) Generate any Inspection report (Welcome → start an Inspection → add one Pass area → Finalize → Generate Report). Header on every page should read "Fire Inspection Report" in dark gray with a thin gray divider. No red "TTI HELPER" wordmark.
+
+(3) Spot-check both reports to confirm no other content changed (zone tables, signatures, footer, etc.).
+
+All (29) panel support (Edwards EST3 + Vigilant VM-1 + EST iO + Notifier + Fire-Lite) is unchanged.
+
+## 0z(29). (29) closeout (historical) — Edwards EST3 panel support
+
+**Closeout state as of 2026-05-06:**
+- (29) IPA was built 2026-05-05 18:11 (~40.5 MB), uploaded to TestFlight 2026-05-05, and field-tested OK 2026-05-06. Now superseded by (30) on disk.
+- (28) IPA built 2026-05-05 13:27 was **NOT uploaded** to TestFlight (superseded by (29) before upload); tracked here for ancestry only.
+- 346/346 mobile tests passed (+21 EST3 fixtures over (28)'s 325).
 
 **(29) scope shipped — Edwards EST3 panel routed through the existing Vigilant parser:**
 
